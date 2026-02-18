@@ -2,7 +2,7 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_NAME = 'hazard-detect-v2';
+const CACHE_NAME = 'hazard-detect-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
