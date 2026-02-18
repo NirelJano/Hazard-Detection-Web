@@ -1,0 +1,86 @@
+<!-- Live Detection Page -->
+<div class="min-h-screen safe-top safe-bottom bg-black">
+
+    <!-- Header (semi-transparent overlay) -->
+    <header class="fixed top-0 left-0 right-0 z-40 px-5 py-4 flex items-center gap-3"
+        style="background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);">
+        <button onclick="navigateTo('dashboard')" class="text-white/70 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </button>
+        <h1 class="text-lg font-bold text-white">Live Detection</h1>
+        <span id="detection-status" class="ml-auto text-xs text-dark-400">Initializing...</span>
+    </header>
+
+    <!-- Camera Feed + Overlay Canvas -->
+    <div class="relative w-full h-screen">
+        <video id="camera-feed" class="w-full h-full object-cover" autoplay muted playsinline></video>
+        <canvas id="live-canvas" class="detection-canvas"></canvas>
+
+        <!-- Detection Controls (bottom overlay) -->
+        <div class="fixed bottom-20 left-0 right-0 flex justify-center gap-4 px-6 z-30">
+            <button id="start-detection-btn"
+                class="btn btn-primary px-8 py-3 text-base shadow-xl shadow-primary-500/30">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Start Detection
+            </button>
+
+            <button id="stop-detection-btn"
+                class="hidden btn btn-danger px-8 py-3 text-base shadow-xl shadow-red-500/30">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+                Stop
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" style="background:rgba(0,0,0,0.9);">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a class="nav-item" data-route="dashboard" onclick="navigateTo('dashboard')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" />
+                </svg>
+                Home
+            </a>
+            <a class="nav-item" data-route="upload" onclick="navigateTo('upload')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Upload
+            </a>
+            <a class="nav-item active" data-route="live-detection" onclick="navigateTo('live-detection')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Live
+            </a>
+            <a class="nav-item" data-route="settings" onclick="navigateTo('settings')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Settings
+            </a>
+        </div>
+    </nav>
+</div>
+
+<!-- Google Maps API (for Reverse Geocoding on auto-save) -->
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=geocoding"></script>

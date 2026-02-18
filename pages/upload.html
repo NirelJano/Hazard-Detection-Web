@@ -1,0 +1,111 @@
+<!-- Upload & Static Detection Page -->
+<div class="min-h-screen safe-top safe-bottom">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-40 px-5 md:px-8 py-4 flex items-center gap-3"
+        style="background:rgba(15,23,42,0.9);backdrop-filter:blur(12px);">
+        <button onclick="navigateTo('dashboard')" class="text-dark-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </button>
+        <h1 class="text-lg md:text-xl font-bold">Image Upload</h1>
+    </header>
+
+    <main class="px-5 md:px-8 lg:px-12 pb-6 max-w-5xl mx-auto">
+
+        <!-- Desktop: side-by-side. Mobile: stacked -->
+        <div class="flex flex-col lg:flex-row gap-6">
+
+            <!-- Left column: Upload + Preview -->
+            <div class="flex-1 space-y-5">
+                <!-- Upload Area -->
+                <div id="upload-area"
+                    class="glass-card border-2 border-dashed border-dark-600 hover:border-primary-500 transition-colors cursor-pointer p-8 md:p-12 text-center animate-fade-in">
+                    <svg class="w-12 h-12 md:w-16 md:h-16 mx-auto text-dark-500 mb-3" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p class="text-dark-300 font-medium text-sm md:text-base">Tap to upload or drag & drop</p>
+                    <p class="text-dark-500 text-xs md:text-sm mt-1">Supports JPG, PNG, WebP</p>
+                    <input id="file-input" type="file" accept="image/*" class="hidden" />
+                </div>
+
+                <!-- Image Preview + Detection Canvas -->
+                <div class="relative animate-fade-in">
+                    <img id="image-preview" class="hidden w-full rounded-xl" alt="Preview" />
+                    <canvas id="detection-canvas" class="detection-canvas rounded-xl"></canvas>
+                </div>
+            </div>
+
+            <!-- Right column: Results + Actions -->
+            <div class="lg:w-80 xl:w-96 space-y-5">
+                <!-- Detection Loading -->
+                <div id="detection-loading" class="hidden flex items-center gap-3 p-4 glass-card-light">
+                    <div class="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin">
+                    </div>
+                    <span class="text-sm text-dark-300">Running hazard detection...</span>
+                </div>
+
+                <!-- Detection Result -->
+                <div id="detection-result" class="animate-fade-in"></div>
+
+                <!-- Location Info -->
+                <div class="glass-card-light p-4 animate-fade-in">
+                    <p class="text-xs text-dark-500 mb-1">📍 Location</p>
+                    <p id="detected-address" class="text-sm text-dark-300">Waiting for image...</p>
+                </div>
+
+                <!-- Save Report Button (hidden by default) -->
+                <button id="save-report-btn" class="hidden btn btn-primary w-full text-base py-3.5">
+                    💾 Save Report
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Bottom Navigation (mobile only) -->
+    <nav class="bottom-nav md:hidden">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a class="nav-item" data-route="dashboard" onclick="navigateTo('dashboard')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" />
+                </svg>
+                Home
+            </a>
+            <a class="nav-item active" data-route="upload" onclick="navigateTo('upload')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Upload
+            </a>
+            <a class="nav-item" data-route="live-detection" onclick="navigateTo('live-detection')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Live
+            </a>
+            <a class="nav-item" data-route="settings" onclick="navigateTo('settings')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Settings
+            </a>
+        </div>
+    </nav>
+</div>
+
+<!-- EXIF.js for GPS extraction from images -->
+<script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
+
+<!-- Google Maps API (for Reverse Geocoding) -->
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=geocoding"></script>

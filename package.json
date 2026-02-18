@@ -1,0 +1,17 @@
+{
+    "name": "hazard-detection-web",
+    "version": "1.0.0",
+    "description": "Road Hazard Detection PWA - AI-powered road safety reporting",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "keywords": [
+        "hazard",
+        "detection",
+        "pwa",
+        "tensorflow"
+    ],
+    "license": "ISC"
+}

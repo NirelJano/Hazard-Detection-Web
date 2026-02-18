@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="Road Hazard Detection - AI-powered road safety reporting" />
+  <meta name="theme-color" content="#3b82f6" />
+
+  <title>Road Hazard Detection</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+            dark: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617' },
+            success: '#22c55e',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body class="bg-dark-950 text-white font-sans min-h-screen">
+
+  <!-- App Shell - Content will be loaded here -->
+  <div id="app">
+    <!-- Loading Spinner -->
+    <div id="loading-screen" class="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div class="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-dark-400 text-sm">Loading...</p>
+    </div>
+  </div>
+
+  <!-- App Entry Point -->
+  <script type="module" src="js/app.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('[App] SW registered:', reg.scope))
+          .catch((err) => console.warn('[App] SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+
+</html>
