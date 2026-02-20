@@ -425,14 +425,14 @@ body {
 /* Sidebar shift for desktop */
 @media (min-width: 768px) {
   .main-content-shifted {
-    padding-left: 5rem;
-    /* Match w-20 */
+    margin-left: 5rem !important;
+    width: calc(100% - 5rem) !important;
   }
 }
 
 @media (min-width: 1024px) {
   .main-content-shifted {
-    padding-left: 14rem;
-    /* Match w-56 */
+    margin-left: 14rem !important;
+    width: calc(100% - 14rem) !important;
   }
 }

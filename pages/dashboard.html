@@ -14,51 +14,53 @@
         </button>
     </header>
 
-    <main class="main-content-shifted px-5 md:px-8 pb-6 space-y-6 w-full">
+    <main class="main-content-shifted px-5 md:px-8 pb-6 w-full">
+        <div class="max-w-6xl mx-auto space-y-6 w-full">
 
-        <!-- Stats Row -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in">
-            <div class="glass-card p-4 md:p-5 text-center">
-                <p class="text-2xl md:text-3xl font-bold text-primary-400" id="reports-count">0</p>
-                <p class="text-dark-400 text-xs md:text-sm mt-1">Reports</p>
+            <!-- Stats Row -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in">
+                <div class="glass-card p-4 md:p-5 text-center">
+                    <p class="text-2xl md:text-3xl font-bold text-primary-400" id="reports-count">0</p>
+                    <p class="text-dark-400 text-xs md:text-sm mt-1">Reports</p>
+                </div>
+                <div class="glass-card p-4 md:p-5 text-center">
+                    <p class="text-2xl md:text-3xl font-bold text-success" id="fixed-count">0</p>
+                    <p class="text-dark-400 text-xs md:text-sm mt-1">Fixed</p>
+                </div>
+                <div class="glass-card p-4 md:p-5 text-center hidden md:block">
+                    <p class="text-2xl md:text-3xl font-bold text-warning" id="pending-count">0</p>
+                    <p class="text-dark-400 text-xs md:text-sm mt-1">In Progress</p>
+                </div>
+                <div class="glass-card p-4 md:p-5 text-center hidden md:block">
+                    <p class="text-2xl md:text-3xl font-bold text-danger" id="open-count">0</p>
+                    <p class="text-dark-400 text-xs md:text-sm mt-1">Open</p>
+                </div>
             </div>
-            <div class="glass-card p-4 md:p-5 text-center">
-                <p class="text-2xl md:text-3xl font-bold text-success" id="fixed-count">0</p>
-                <p class="text-dark-400 text-xs md:text-sm mt-1">Fixed</p>
-            </div>
-            <div class="glass-card p-4 md:p-5 text-center hidden md:block">
-                <p class="text-2xl md:text-3xl font-bold text-warning" id="pending-count">0</p>
-                <p class="text-dark-400 text-xs md:text-sm mt-1">In Progress</p>
-            </div>
-            <div class="glass-card p-4 md:p-5 text-center hidden md:block">
-                <p class="text-2xl md:text-3xl font-bold text-danger" id="open-count">0</p>
-                <p class="text-dark-400 text-xs md:text-sm mt-1">Open</p>
-            </div>
-        </div>
 
-        <!-- Stacked layout using custom container -->
-        <div class="dashboard-container">
+            <!-- Stacked layout using custom container -->
+            <div class="dashboard-container">
 
-            <!-- Map Section -->
-            <section class="dashboard-section">
-                <h2 class="text-sm font-semibold text-dark-300 mb-2">📍 Hazard Map</h2>
-                <div id="map-container"
-                    class="w-full h-[300px] md:h-[400px] lg:h-[500px] rounded-xl overflow-hidden glass-card">
-                    <div class="w-full h-full flex items-center justify-center text-dark-500 text-sm">
-                        <p>Loading map...</p>
+                <!-- Map Section -->
+                <section class="dashboard-section">
+                    <h2 class="text-sm font-semibold text-dark-300 mb-2">📍 Hazard Map</h2>
+                    <div id="map-container"
+                        class="w-full h-[300px] md:h-[400px] lg:h-[500px] rounded-xl overflow-hidden glass-card">
+                        <div class="w-full h-full flex items-center justify-center text-dark-500 text-sm">
+                            <p>Loading map...</p>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- Reports List -->
-            <section class="dashboard-section">
-                <h2 class="text-sm font-semibold text-dark-300 mb-2">📋 Recent Reports</h2>
-                <div id="reports-list" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                    <!-- Reports rendered dynamically -->
-                    <div class="text-center py-8 text-dark-500 text-sm">Loading reports...</div>
-                </div>
-            </section>
+                <!-- Reports List -->
+                <section class="dashboard-section">
+                    <h2 class="text-sm font-semibold text-dark-300 mb-2">📋 Recent Reports</h2>
+                    <div id="reports-list" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                        <!-- Reports rendered dynamically -->
+                        <div class="text-center py-8 text-dark-500 text-sm">Loading reports...</div>
+                    </div>
+                </section>
 
+            </div>
         </div>
 
     </main>

@@ -8,7 +8,8 @@ import {
     signInWithEmailAndPassword,
     GoogleAuthProvider,
     signInWithPopup,
-    updateProfile
+    updateProfile,
+    sendPasswordResetEmail
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js';
 import {
     doc,
@@ -79,12 +80,51 @@ function setupLogin() {
     if (googleBtn) {
         googleBtn.addEventListener('click', handleGoogleSignIn);
     }
+
+    const forgotBtn = document.getElementById('forgot-password-link');
+    if (forgotBtn) {
+        forgotBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleForgotPassword();
+        });
+    }
+}
+
+// ---------- Forgot Password ----------
+async function handleForgotPassword() {
+    const emailInput = document.getElementById('login-email');
+    const forgotBtn = document.getElementById('forgot-password-link');
+    const email = emailInput ? emailInput.value.trim() : '';
+
+    if (!email) {
+        showToast('Please enter your email first', 'error');
+        if (emailInput) emailInput.focus();
+        return;
+    }
+
+    if (forgotBtn) {
+        forgotBtn.style.pointerEvents = 'none';
+        forgotBtn.style.opacity = '0.5';
+    }
+
+    try {
+        await sendPasswordResetEmail(auth, email);
+        showToast('Password reset email sent!', 'success');
+    } catch (err) {
+        console.error('[Auth] Password reset error:', err);
+        showToast(friendlyError(err.code), 'error');
+        if (forgotBtn) {
+            forgotBtn.style.pointerEvents = 'auto';
+            forgotBtn.style.opacity = '1';
+        }
+    }
 }
 
 // ---------- Register ----------
 function setupRegister() {
     const form = document.getElementById('register-form');
     const googleBtn = document.getElementById('google-register-btn');
+
 
     if (form) {
         form.addEventListener('submit', async (e) => {
@@ -182,6 +222,9 @@ function friendlyError(code) {
         'auth/too-many-requests': 'Too many attempts. Please wait.',
         'auth/weak-password': 'Password is too weak',
         'auth/invalid-credential': 'Invalid email or password',
+        'auth/expired-action-code': 'The reset link has expired',
+        'auth/invalid-action-code': 'The reset link is invalid',
+        'auth/user-disabled': 'This account has been disabled',
     };
     return map[code] || 'An error occurred. Please try again.';
 }

@@ -2,7 +2,8 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_NAME = 'hazard-detect-v5';
+const CACHE_VERSION = '2'; // Bump version to force cache update
+const CACHE_NAME = 'hazard-detect-v' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -61,7 +62,8 @@ self.addEventListener('fetch', (event) => {
   if (
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('firebaseio.com') ||
-    url.hostname.includes('firestore.googleapis.com')
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.pathname.startsWith('/__/auth/')
   ) {
     return;
   }
