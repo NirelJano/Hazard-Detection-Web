@@ -2,7 +2,7 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_NAME = 'hazard-detect-v3';
+const CACHE_NAME = 'hazard-detect-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -13,6 +13,9 @@ const ASSETS_TO_CACHE = [
   '/pages/live-detection.html',
   '/pages/settings.html',
   '/css/styles.css',
+  '/css/dashboard.css',
+  '/css/upload.css',
+  '/css/live-detection.css',
   '/js/app.js',
   '/js/auth.js',
   '/js/dashboard.js',
@@ -21,6 +24,7 @@ const ASSETS_TO_CACHE = [
   '/js/settings.js',
   '/manifest.json'
 ];
+
 
 // Install: Cache core assets
 self.addEventListener('install', (event) => {

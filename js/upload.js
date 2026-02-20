@@ -13,7 +13,8 @@ import {
 let worker = null;
 let currentGPS = null;
 let detectionResult = null;
-let currentFile = null; // Store the uploaded file for later use
+let currentFile = null;
+let modelReady = false; // Track if worker model is loaded
 
 export function init() {
     setupWorker();
@@ -31,6 +32,7 @@ function setupWorker() {
         switch (type) {
             case 'model-loaded':
                 console.log('[Upload] Model loaded in worker');
+                modelReady = true;
                 break;
 
             case 'detection-result':
@@ -100,6 +102,10 @@ async function handleFile(file) {
     currentFile = file;
     hideSaveButton();
     showLoading();
+    const locationContainer = document.getElementById('location-container');
+    if (locationContainer) locationContainer.classList.add('hidden');
+    const addressEl = document.getElementById('detected-address');
+    if (addressEl) addressEl.textContent = 'Waiting for image...';
 
     // Display preview
     const preview = document.getElementById('image-preview');
@@ -109,10 +115,19 @@ async function handleFile(file) {
         if (preview) {
             preview.src = img.src;
             preview.classList.remove('hidden');
+            const locationContainer = document.getElementById('location-container');
+            if (locationContainer) locationContainer.classList.remove('hidden');
         }
 
         // Extract EXIF GPS using exif-js
         await extractGPS(file);
+
+        // Wait for model if not ready
+        if (!modelReady) {
+            console.log('[Upload] Model not ready, waiting...');
+            showToast('Loading AI model...', 'info');
+            // We could naturally wait for the model-loaded event, but for now simple check
+        }
 
         // Send to worker for detection
         const bitmap = await createImageBitmap(img);
@@ -125,7 +140,7 @@ async function handleFile(file) {
 // ---------- GPS Extraction (exif-js) ----------
 async function extractGPS(file) {
     return new Promise((resolve) => {
-        // exif-js is loaded via CDN in upload.html
+        console.log('[Upload] Starting GPS extraction for:', file.name);
         if (typeof EXIF === 'undefined') {
             console.warn('[Upload] EXIF library not loaded, falling back to geolocation');
             fallbackToGeolocation().then(resolve);
@@ -133,20 +148,29 @@ async function extractGPS(file) {
         }
 
         EXIF.getData(file, function () {
+            const allTags = EXIF.getAllTags(this);
+            console.log('[Upload] All EXIF tags found:', Object.keys(allTags));
+
             const lat = EXIF.getTag(this, 'GPSLatitude');
             const lng = EXIF.getTag(this, 'GPSLongitude');
             const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
             const lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
 
             if (lat && lng) {
-                const latitude = convertDMSToDD(lat, latRef);
-                const longitude = convertDMSToDD(lng, lngRef);
-                currentGPS = { lat: latitude, lng: longitude };
-                console.log('[Upload] GPS from EXIF:', currentGPS);
-                reverseGeocode(latitude, longitude);
-                resolve();
+                console.log('[Upload] Raw GPS data found:', { lat, lng, latRef, lngRef });
+                try {
+                    const latitude = convertDMSToDD(lat, latRef);
+                    const longitude = convertDMSToDD(lng, lngRef);
+                    currentGPS = { lat: latitude, lng: longitude };
+                    console.log('[Upload] Successfully extracted GPS:', currentGPS);
+                    reverseGeocode(latitude, longitude);
+                    resolve();
+                } catch (err) {
+                    console.error('[Upload] Error converting DMS to DD:', err);
+                    fallbackToGeolocation().then(resolve);
+                }
             } else {
-                console.warn('[Upload] No EXIF GPS found');
+                console.warn('[Upload] No GPS tags found in EXIF');
                 showToast('No GPS data in image. Using current location.', 'info');
                 fallbackToGeolocation().then(resolve);
             }
@@ -155,9 +179,22 @@ async function extractGPS(file) {
 }
 
 function convertDMSToDD(dms, ref) {
-    const dd = dms[0] + dms[1] / 60 + dms[2] / 3600;
+    // Some devices return rational objects, others return arrays of numbers
+    const parse = (val) => {
+        if (typeof val === 'object' && val.numerator !== undefined) {
+            return val.numerator / val.denominator;
+        }
+        return val;
+    };
+
+    const d = parse(dms[0]);
+    const m = parse(dms[1]);
+    const s = parse(dms[2]);
+
+    const dd = d + m / 60 + s / 3600;
     return (ref === 'S' || ref === 'W') ? -dd : dd;
 }
+
 
 async function fallbackToGeolocation() {
     if (!navigator.geolocation) {
@@ -182,19 +219,20 @@ async function fallbackToGeolocation() {
 }
 
 // ---------- Reverse Geocoding ----------
-async function reverseGeocode(lat, lng) {
+function reverseGeocode(lat, lng) {
     if (!window.google) return;
     const geocoder = new google.maps.Geocoder();
-    try {
-        const res = await geocoder.geocode({ location: { lat, lng } });
-        if (res.results && res.results[0]) {
+
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+            console.log('[Upload] Reverse geocode result:', results[0].formatted_address);
             const addressEl = document.getElementById('detected-address');
-            if (addressEl) addressEl.textContent = res.results[0].formatted_address;
-            currentGPS.address = res.results[0].formatted_address;
+            if (addressEl) addressEl.textContent = results[0].formatted_address;
+            currentGPS.address = results[0].formatted_address;
+        } else {
+            console.warn('[Upload] Geocoder failed due to:', status);
         }
-    } catch (err) {
-        console.warn('[Upload] Reverse geocode failed:', err);
-    }
+    });
 }
 
 // ---------- Detection Result Handler ----------

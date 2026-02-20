@@ -1,4 +1,5 @@
 <!-- Dashboard Page -->
+<link rel="stylesheet" href="../css/dashboard.css">
 <div class="min-h-screen safe-top safe-bottom">
 
     <!-- Header -->
@@ -13,7 +14,7 @@
         </button>
     </header>
 
-    <main class="px-5 md:px-8 lg:px-12 pb-6 space-y-6 max-w-7xl mx-auto">
+    <main class="main-content-shifted px-5 md:px-8 pb-6 space-y-6 w-full">
 
         <!-- Stats Row -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in">
@@ -35,13 +36,14 @@
             </div>
         </div>
 
-        <!-- Desktop: side-by-side layout. Mobile: stacked -->
-        <div class="flex flex-col lg:flex-row gap-6">
+        <!-- Stacked layout using custom container -->
+        <div class="dashboard-container">
 
             <!-- Map Section -->
-            <section class="animate-fade-in lg:flex-1">
+            <section class="dashboard-section">
                 <h2 class="text-sm font-semibold text-dark-300 mb-2">📍 Hazard Map</h2>
-                <div id="map-container" class="w-full h-56 md:h-72 lg:h-96 rounded-xl overflow-hidden glass-card">
+                <div id="map-container"
+                    class="w-full h-[300px] md:h-[400px] lg:h-[500px] rounded-xl overflow-hidden glass-card">
                     <div class="w-full h-full flex items-center justify-center text-dark-500 text-sm">
                         <p>Loading map...</p>
                     </div>
@@ -49,10 +51,9 @@
             </section>
 
             <!-- Reports List -->
-            <section class="animate-fade-in lg:w-96 xl:w-[28rem]">
+            <section class="dashboard-section">
                 <h2 class="text-sm font-semibold text-dark-300 mb-2">📋 Recent Reports</h2>
-                <div id="reports-list"
-                    class="space-y-3 max-h-72 md:max-h-96 lg:max-h-[calc(100vh-16rem)] overflow-y-auto pr-1">
+                <div id="reports-list" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                     <!-- Reports rendered dynamically -->
                     <div class="text-center py-8 text-dark-500 text-sm">Loading reports...</div>
                 </div>
@@ -61,6 +62,8 @@
         </div>
 
     </main>
+
+
 
     <!-- Bottom Navigation (mobile only) -->
     <nav class="bottom-nav md:hidden">
@@ -133,7 +136,3 @@
         </a>
     </nav>
 </div>
-
-<!-- Google Maps API - Replace YOUR_API_KEY -->
-<script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=Function.prototype&libraries=geocoding"></script>
