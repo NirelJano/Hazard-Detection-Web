@@ -42,6 +42,28 @@
 
   <!-- Custom Styles -->
   <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- EXIF.js -->
+  <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
+
+  <!-- App Configuration -->
+  <script src="/env.js"></script>
+
+  <!-- Google Maps API Dynamic Loader -->
+  <script>
+    (function () {
+      const apiKey = window.ENV?.GOOGLE_MAPS_API_KEY;
+      if (apiKey && apiKey !== 'YOUR_GOOGLE_MAPS_API_KEY') {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geocoding`;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      } else {
+        console.warn('[App] Google Maps API key is missing. Geocoding will be disabled.');
+      }
+    })();
+  </script>
 </head>
 
 <body class="bg-dark-950 text-white font-sans min-h-screen">

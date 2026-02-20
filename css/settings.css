@@ -1,0 +1,11 @@
+/* Settings Page Specific Styles */
+
+.settings-container {
+    width: 100%;
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+#change-password-form input {
+    /* Ensure consistent spacing in forms */
+    margin-bottom: 0.5rem;
+}
