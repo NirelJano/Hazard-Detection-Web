@@ -317,7 +317,7 @@ function drawBoundingBoxes(detections) {
     });
 }
 
-async function uploadToCloudinary(blob, filename = 'hazard.jpg') {
+export async function uploadToCloudinary(blob, filename = 'hazard.jpg') {
     const cloudName = window.ENV?.CLOUDINARY_CLOUD_NAME;
     const uploadPreset = window.ENV?.CLOUDINARY_UPLOAD_PRESET;
 

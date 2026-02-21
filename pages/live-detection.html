@@ -14,6 +14,14 @@
         <span id="detection-status" class="ml-auto text-xs text-dark-400">Initializing...</span>
     </header>
 
+    <!-- Loading Overlay -->
+    <div id="model-loading-overlay"
+        class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-500">
+        <div class="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 class="text-white text-lg font-bold">Loading AI Model...</h2>
+        <p class="text-dark-300 text-sm mt-2">Please wait, preparing detection engine.</p>
+    </div>
+
     <!-- Camera Feed + Overlay Canvas -->
     <div class="relative w-full h-screen">
         <video id="camera-feed" class="w-full h-full object-cover" autoplay muted playsinline></video>

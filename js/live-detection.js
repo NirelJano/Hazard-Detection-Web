@@ -4,6 +4,7 @@
 
 import { auth, db } from '../firebase-config.js';
 import { showToast } from './app.js';
+import { uploadToCloudinary } from './upload.js';
 import {
     collection,
     doc,
@@ -14,9 +15,10 @@ import {
 let worker = null;
 let videoStream = null;
 let isDetecting = false;
+let isModelReady = false;
 let detectionInterval = null;
-let lastSaveTime = 0;
-const SAVE_COOLDOWN = 5000; // 5-second de-duplication
+let tracker = null;
+
 const CONFIDENCE_THRESHOLD = 0.45;
 const DETECTION_INTERVAL_MS = 250; // ~4 FPS inference
 
@@ -24,6 +26,7 @@ export function init() {
     setupWorker();
     setupCamera();
     setupControls();
+    tracker = new HazardTracker();
 }
 
 // ---------- Web Worker ----------
@@ -36,6 +39,9 @@ function setupWorker() {
         switch (type) {
             case 'model-loaded':
                 console.log('[Live] Model ready');
+                isModelReady = true;
+                const overlay = document.getElementById('model-loading-overlay');
+                if (overlay) overlay.classList.add('hidden');
                 updateStatus('Model loaded. Tap Start to begin.');
                 break;
             case 'detection-result':
@@ -119,23 +125,17 @@ function startDetectionLoop() {
 // ---------- Handle Live Detections ----------
 function handleLiveDetection(data) {
     const { detections } = data;
-    drawOverlay(detections);
+    const video = document.getElementById('camera-feed');
 
-    if (!detections || detections.length === 0) return;
+    // Pass detections into the tracker
+    const activeTracks = tracker.update(detections, video);
 
-    // Auto-save logic: confidence > threshold + cooldown
-    const best = detections.reduce((a, b) => (a.score > b.score ? a : b));
-    if (best.score >= CONFIDENCE_THRESHOLD) {
-        const now = Date.now();
-        if (now - lastSaveTime > SAVE_COOLDOWN) {
-            lastSaveTime = now;
-            autoSaveReport(best);
-        }
-    }
+    // Draw tracking boxes
+    drawOverlay(activeTracks);
 }
 
 // ---------- Draw Overlay ----------
-function drawOverlay(detections) {
+function drawOverlay(tracks) {
     const canvas = document.getElementById('live-canvas');
     const video = document.getElementById('camera-feed');
     if (!canvas || !video) return;
@@ -145,10 +145,10 @@ function drawOverlay(detections) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (!detections) return;
+    if (!tracks || tracks.length === 0) return;
 
-    detections.forEach((det) => {
-        const [x, y, w, h] = det.bbox;
+    tracks.forEach((track) => {
+        const [x, y, w, h] = track.bbox;
 
         // Box
         ctx.strokeStyle = '#22c55e';
@@ -157,7 +157,7 @@ function drawOverlay(detections) {
 
         // Label background
         ctx.fillStyle = '#22c55e';
-        const label = `${det.label} ${(det.score * 100).toFixed(0)}%`;
+        const label = `${track.label} (ID: ${track.id})`;
         ctx.font = 'bold 14px Inter';
         const tw = ctx.measureText(label).width;
         ctx.fillRect(x, y - 22, tw + 8, 22);
@@ -168,8 +168,147 @@ function drawOverlay(detections) {
     });
 }
 
+// ---------- Object Tracking (IoU) ----------
+class HazardTracker {
+    constructor() {
+        this.tracks = [];
+        this.nextId = 1;
+        this.MAX_AGE = 5; // Frames to keep without seeing it
+        this.MIN_HITS = 2; // Frames seen before it's considered valid
+        this.IOU_THRESHOLD = 0.3; // Overlap required to match
+    }
+
+    update(detections, videoElement) {
+        // Increment age of all tracks
+        this.tracks.forEach(t => t.age++);
+
+        // Match detections to existing tracks
+        const matchedDetections = new Set();
+
+        for (let track of this.tracks) {
+            let bestIoU = 0;
+            let bestDetIdx = -1;
+
+            for (let i = 0; i < detections.length; i++) {
+                if (matchedDetections.has(i)) continue;
+                if (detections[i].label !== track.label) continue;
+
+                const iou = this.calculateIoU(track.bbox, detections[i].bbox);
+                if (iou > bestIoU && iou > this.IOU_THRESHOLD) {
+                    bestIoU = iou;
+                    bestDetIdx = i;
+                }
+            }
+
+            if (bestDetIdx !== -1) {
+                const det = detections[bestDetIdx];
+                track.bbox = det.bbox;
+                track.age = 0; // Reset age since we saw it
+                track.hits++;
+
+                // Keep the clearest frame
+                if (det.score > track.bestScore) {
+                    track.bestScore = det.score;
+                    track.bestFrameCanvas = this.captureFrameCanvas(videoElement, track);
+                }
+                matchedDetections.add(bestDetIdx);
+            }
+        }
+
+        // Create new tracks 
+        for (let i = 0; i < detections.length; i++) {
+            if (!matchedDetections.has(i)) {
+                const det = detections[i];
+                if (det.score >= CONFIDENCE_THRESHOLD) {
+                    const newTrack = {
+                        id: this.nextId++,
+                        label: det.label,
+                        bbox: det.bbox,
+                        age: 0,
+                        hits: 1,
+                        bestScore: det.score,
+                        saved: false
+                    };
+                    newTrack.bestFrameCanvas = this.captureFrameCanvas(videoElement, newTrack);
+                    this.tracks.push(newTrack);
+                }
+            }
+        }
+
+        // Process mature/lost tracks
+        const activeTracks = [];
+        for (let track of this.tracks) {
+            // Save if it's stable and we just lost track of it slightly
+            // This ensures we have the best frame before saving.
+            if (track.hits >= this.MIN_HITS && !track.saved && track.age === 1) {
+                track.saved = true;
+                autoSaveReport(track);
+            }
+
+            // Keep if not too old
+            if (track.age < this.MAX_AGE) {
+                activeTracks.push(track);
+            }
+        }
+
+        this.tracks = activeTracks;
+        return this.tracks.filter(t => t.hits >= 1 && t.age < 2);
+    }
+
+    calculateIoU(box1, box2) {
+        const [x1, y1, w1, h1] = box1;
+        const [x2, y2, w2, h2] = box2;
+
+        const xA = Math.max(x1, x2);
+        const yA = Math.max(y1, y2);
+        const xB = Math.min(x1 + w1, x2 + w2);
+        const yB = Math.min(y1 + h1, y2 + h2);
+
+        const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+        const box1Area = w1 * h1;
+        const box2Area = w2 * h2;
+        const iou = interArea / parseFloat(box1Area + box2Area - interArea);
+
+        return iou;
+    }
+
+    captureFrameCanvas(video, trackInfo) {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (trackInfo) {
+                const [x, y, w, h] = trackInfo.bbox;
+
+                // Draw Box
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, w, h);
+
+                // Draw Label Background
+                ctx.fillStyle = '#22c55e';
+                const label = `${trackInfo.label} ${(trackInfo.bestScore * 100).toFixed(0)}%`;
+                ctx.font = 'bold 14px Inter';
+                const tw = ctx.measureText(label).width;
+                ctx.fillRect(x, y - 22, tw + 8, 22);
+
+                // Draw Label Text
+                ctx.fillStyle = '#fff';
+                ctx.fillText(label, x + 4, y - 6);
+            }
+
+            return canvas;
+        } catch (e) {
+            return null;
+        }
+    }
+}
+
 // ---------- Auto-Save Report ----------
-async function autoSaveReport(detection) {
+async function autoSaveReport(track) {
     const user = auth.currentUser;
     if (!user) return;
 
@@ -208,6 +347,19 @@ async function autoSaveReport(detection) {
         const min = String(now.getMinutes()).padStart(2, '0');
         const formattedDate = `${dd}/${mm}/${yy} ${hh}:${min}`;
 
+        // Upload image if we have it
+        let imageUrl = '';
+        if (track.bestFrameCanvas) {
+            try {
+                const blob = await new Promise(resolve => track.bestFrameCanvas.toBlob(resolve, 'image/jpeg', 0.8));
+                if (blob) {
+                    imageUrl = await uploadToCloudinary(blob, `hazard_live_${Date.now()}.jpg`);
+                }
+            } catch (blurErr) {
+                console.warn('[Live] Image upload failed', blurErr);
+            }
+        }
+
         const counterRef = doc(db, 'metadata', 'reportCounter');
         const newReportRef = doc(collection(db, 'reports'));
 
@@ -220,17 +372,17 @@ async function autoSaveReport(detection) {
             transaction.set(counterRef, { count: nextId });
             transaction.set(newReportRef, {
                 id: nextId,
-                hazardType: detection.label,
+                hazardType: track.label,
                 date: formattedDate,
                 coordinate: new GeoPoint(gps.lat, gps.lng),
                 address,
-                imageUrl: '', // TODO: Add image storage solution
+                imageUrl: imageUrl,
                 reportedBy: user.displayName || user.email || 'Unknown User',
                 status: 'new',
             });
         });
 
-        showToast(`Auto-saved: ${detection.label}`, 'success');
+        showToast(`Auto-saved: ${track.label} (ID: ${track.id})`, 'success');
     } catch (err) {
         console.error('[Live] Auto-save error:', err);
     }
