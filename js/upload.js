@@ -317,6 +317,68 @@ function drawBoundingBoxes(detections) {
     });
 }
 
+async function uploadToCloudinary(blob, filename = 'hazard.jpg') {
+    const cloudName = window.ENV?.CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = window.ENV?.CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+        throw new Error('Cloudinary config missing in .env file');
+    }
+
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+    const formData = new FormData();
+    formData.append('file', blob, filename);
+    formData.append('upload_preset', uploadPreset);
+
+    const response = await fetch(url, {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to upload image to Cloudinary');
+    }
+
+    const data = await response.json();
+    return data.secure_url;
+}
+
+// Helper to get image + bounding boxes as a single Blob
+async function getCombinedCanvasBlob() {
+    return new Promise((resolve, reject) => {
+        const preview = document.getElementById('image-preview');
+        const overlayCanvas = document.getElementById('detection-canvas');
+
+        if (!preview || !overlayCanvas) {
+            reject(new Error('Missing image preview or canvas'));
+            return;
+        }
+
+        // Create an offscreen canvas to merge them
+        const mergedCanvas = document.createElement('canvas');
+        mergedCanvas.width = preview.naturalWidth;
+        mergedCanvas.height = preview.naturalHeight;
+        const ctx = mergedCanvas.getContext('2d');
+
+        // Draw original image first
+        ctx.drawImage(preview, 0, 0, mergedCanvas.width, mergedCanvas.height);
+
+        // Draw the overlay canvas (which contains the green boxes) on top
+        // Note: overlayCanvas is already sized to naturalWidth/Height in drawBoundingBoxes
+        ctx.drawImage(overlayCanvas, 0, 0);
+
+        // Convert to highly compact JPEG blob
+        mergedCanvas.toBlob(
+            (blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Failed to create blob from canvas'));
+            },
+            'image/jpeg',
+            0.85
+        );
+    });
+}
+
 // ---------- Save Report ----------
 async function saveReport() {
     if (!detectionResult) {
@@ -341,6 +403,11 @@ async function saveReport() {
     }
 
     try {
+        // Create canvas blob and upload to Cloudinary
+        showToast('Uploading image with detection...', 'info');
+        const combinedBlob = await getCombinedCanvasBlob();
+        const uploadedImageUrl = await uploadToCloudinary(combinedBlob, currentFile.name);
+
         const now = new Date();
         const dd = String(now.getDate()).padStart(2, '0');
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -368,7 +435,7 @@ async function saveReport() {
                 date: formattedDate,
                 coordinate: new GeoPoint(currentGPS.lat, currentGPS.lng),
                 address: currentGPS.address || '',
-                imageUrl: '', // TODO: Add image storage solution
+                imageUrl: uploadedImageUrl,
                 reportedBy: user.displayName || user.email || 'Unknown User',
                 status: 'new',
             });
@@ -376,6 +443,33 @@ async function saveReport() {
 
         showToast('Report saved successfully!', 'success');
         hideSaveButton();
+
+        // Clear UI after 5 seconds
+        setTimeout(() => {
+            const preview = document.getElementById('image-preview');
+            const canvas = document.getElementById('detection-canvas');
+            const resultEl = document.getElementById('detection-result');
+            const addressEl = document.getElementById('detected-address');
+
+            if (preview) {
+                preview.src = '';
+                preview.classList.add('hidden');
+            }
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            if (resultEl) resultEl.innerHTML = '';
+            if (addressEl) addressEl.textContent = 'Waiting for image...';
+
+            // Reset location container visibility
+            const locationContainer = document.getElementById('location-container');
+            if (locationContainer) locationContainer.classList.add('hidden');
+
+            currentFile = null;
+            detectionResult = null;
+            currentGPS = null;
+        }, 5000);
     } catch (err) {
         console.error('[Upload] Save error:', err);
         showToast('Failed to save report', 'error');
