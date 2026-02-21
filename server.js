@@ -53,9 +53,9 @@ const server = http.createServer((req, res) => {
     if (filePath === '/env.js') {
         const env = loadEnv();
         const config = {
-            GOOGLE_MAPS_API_KEY: env.GOOGLE_MAPS_API_KEY || '',
-            CLOUDINARY_CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME || '',
-            CLOUDINARY_UPLOAD_PRESET: env.CLOUDINARY_UPLOAD_PRESET || '',
+            GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || '',
+            CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || env.CLOUDINARY_CLOUD_NAME || '',
+            CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET || env.CLOUDINARY_UPLOAD_PRESET || '',
         };
         res.writeHead(200, { 'Content-Type': 'application/javascript' });
         res.end(`window.ENV = ${JSON.stringify(config)};`);
