@@ -7,10 +7,10 @@
 importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js');
 
 let model = null;
-const MODEL_PATH = 'assets/model/model.json'; // Path to your custom model
-const LABELS = ['Pothole', 'Crack', 'Bump', 'Debris']; // Update with your model's labels
+const MODEL_PATH = '/assets/model/model.json'; // Path to your custom model
+const LABELS = ['Crack', 'Pothole', 'Bump', 'Debris']; // Swapped Crack and Pothole
 const NMS_IOU_THRESHOLD = 0.5;
-const NMS_SCORE_THRESHOLD = 0.4;
+const NMS_SCORE_THRESHOLD = 0.45;
 
 // ---------- Message Handler ----------
 self.onmessage = async (e) => {
@@ -97,53 +97,74 @@ async function runDetection(imageBitmap) {
 }
 
 // ---------- Parse Detections ----------
-// NOTE: This function must be adapted to YOUR model's output format.
-// Common formats:
-//   - YOLO: [batch, num_boxes, 5 + num_classes]  (x, y, w, h, obj_conf, class_scores...)
-//   - SSD:  [boxes_tensor, scores_tensor, classes_tensor]
+// YOLOv12 output format is typically: [batch_size, 4_bbox_coords + num_classes, num_anchors]
+// For this model: [1, 6, 8400] -> (x_center, y_center, width, height, class0_conf, class1_conf)
 async function parseDetections(predictions, origWidth, origHeight) {
     const detections = [];
 
-    // Example: generic output parsing (adapt to your model)
-    // This is a placeholder that handles common output shapes
-    let outputTensor;
-    if (Array.isArray(predictions)) {
-        outputTensor = predictions[0];
-    } else {
-        outputTensor = predictions;
-    }
+    // Extract the output tensor
+    const outputTensor = Array.isArray(predictions) ? predictions[0] : predictions;
 
-    const data = await outputTensor.data();
-    const shape = outputTensor.shape;
+    // Squeeze the batch dimension and transpose from [6, 8400] to [8400, 6]
+    // so each row is a single detection anchor prediction
+    const squeezed = outputTensor.squeeze([0]);
+    const transposed = squeezed.transpose([1, 0]);
+    const data = await transposed.data();
 
-    // Placeholder parsing logic - YOU MUST customize this
-    // based on your specific model's output format
-    const numDetections = shape[1] || 0;
-    const stride = shape[2] || 6; // typically: x, y, w, h, confidence, class_id
+    const numAnchors = transposed.shape[0]; // should be 8400
+    const numFeatures = transposed.shape[1]; // should be 6
+    const numClasses = numFeatures - 4; // 2 classes in this case
 
-    for (let i = 0; i < numDetections; i++) {
-        const offset = i * stride;
-        const x = data[offset];
-        const y = data[offset + 1];
+    for (let i = 0; i < numAnchors; i++) {
+        const offset = i * numFeatures;
+
+        // Find best class confidence
+        let maxClassConf = -1;
+        let classId = -1;
+        for (let c = 0; c < numClasses; c++) {
+            const conf = data[offset + 4 + c];
+            if (conf > maxClassConf) {
+                maxClassConf = conf;
+                classId = c;
+            }
+        }
+
+        // If below threshold, skip
+        if (maxClassConf < NMS_SCORE_THRESHOLD) continue;
+
+        const xCenter = data[offset];
+        const yCenter = data[offset + 1];
         const w = data[offset + 2];
         const h = data[offset + 3];
-        const confidence = data[offset + 4];
-        const classId = Math.round(data[offset + 5] || 0);
 
-        if (confidence < NMS_SCORE_THRESHOLD) continue;
+        // Normalize coordinates (0-1) in case the model outputs 0-640 (tensor size)
+        // Some models output normalized coordinates, others do not.
+        const scaleX = xCenter > 1 ? 1 / 640 : 1;
+        const scaleY = yCenter > 1 ? 1 / 640 : 1;
+        const scaleW = w > 1 ? 1 / 640 : 1;
+        const scaleH = h > 1 ? 1 / 640 : 1;
 
+        const normX = xCenter * scaleX;
+        const normY = yCenter * scaleY;
+        const normW = w * scaleW;
+        const normH = h * scaleH;
+
+        // Convert normalized coordinates to pixel coordinates for the original image
         detections.push({
             bbox: [
-                (x - w / 2) * origWidth,
-                (y - h / 2) * origHeight,
-                w * origWidth,
-                h * origHeight,
+                (normX - normW / 2) * origWidth,
+                (normY - normH / 2) * origHeight,
+                normW * origWidth,
+                normH * origHeight,
             ],
-            score: confidence,
+            score: maxClassConf,
             label: LABELS[classId] || `Class ${classId}`,
             classId,
         });
     }
+
+    squeezed.dispose();
+    transposed.dispose();
 
     return detections;
 }

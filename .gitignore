@@ -32,3 +32,7 @@ firebase-debug.log*
 *.swp
 *.swo
 *.swn
+
+# Python
+venv*/
+*.npy

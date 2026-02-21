@@ -6,8 +6,9 @@ import { auth, db } from '../firebase-config.js';
 import { showToast } from './app.js';
 import {
     collection,
-    addDoc,
-    serverTimestamp
+    doc,
+    runTransaction,
+    GeoPoint
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
 
 let worker = null;
@@ -16,7 +17,7 @@ let isDetecting = false;
 let detectionInterval = null;
 let lastSaveTime = 0;
 const SAVE_COOLDOWN = 5000; // 5-second de-duplication
-const CONFIDENCE_THRESHOLD = 0.80;
+const CONFIDENCE_THRESHOLD = 0.45;
 const DETECTION_INTERVAL_MS = 250; // ~4 FPS inference
 
 export function init() {
@@ -199,14 +200,34 @@ async function autoSaveReport(detection) {
         }
 
         // Save to Firestore
-        await addDoc(collection(db, 'reports'), {
-            hazardType: detection.label,
-            date: serverTimestamp(),
-            coordinate: gps,
-            address,
-            imageUrl: '', // TODO: Add image storage solution
-            reportedBy: user.uid,
-            status: 'open',
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const yy = String(now.getFullYear()).slice(-2);
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const formattedDate = `${dd}/${mm}/${yy} ${hh}:${min}`;
+
+        const counterRef = doc(db, 'metadata', 'reportCounter');
+        const newReportRef = doc(collection(db, 'reports'));
+
+        await runTransaction(db, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            let nextId = 1;
+            if (counterDoc.exists()) {
+                nextId = (counterDoc.data().count || 0) + 1;
+            }
+            transaction.set(counterRef, { count: nextId });
+            transaction.set(newReportRef, {
+                id: nextId,
+                hazardType: detection.label,
+                date: formattedDate,
+                coordinate: new GeoPoint(gps.lat, gps.lng),
+                address,
+                imageUrl: '', // TODO: Add image storage solution
+                reportedBy: user.displayName || user.email || 'Unknown User',
+                status: 'new',
+            });
         });
 
         showToast(`Auto-saved: ${detection.label}`, 'success');

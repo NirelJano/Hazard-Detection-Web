@@ -2,12 +2,13 @@
 // Image Upload & Static Detection Module
 // ============================================
 
-import { auth, db } from '../firebase-config.js';
+import { auth, db, firebaseConfig } from '../firebase-config.js';
 import { showToast } from './app.js';
 import {
     collection,
-    addDoc,
-    serverTimestamp
+    doc,
+    runTransaction,
+    GeoPoint
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
 
 let worker = null;
@@ -107,6 +108,13 @@ async function handleFile(file) {
     const addressEl = document.getElementById('detected-address');
     if (addressEl) addressEl.textContent = 'Waiting for image...';
 
+    // Clear previous canvas drawing
+    const canvas = document.getElementById('detection-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
     // Display preview
     const preview = document.getElementById('image-preview');
     const img = new Image();
@@ -142,8 +150,9 @@ async function extractGPS(file) {
     return new Promise((resolve) => {
         console.log('[Upload] Starting GPS extraction for:', file.name);
         if (typeof EXIF === 'undefined') {
-            console.warn('[Upload] EXIF library not loaded, falling back to geolocation');
-            fallbackToGeolocation().then(resolve);
+            console.warn('[Upload] EXIF library not loaded, cannot extract GPS');
+            showToast('EXIF library missing. Cannot read location.', 'error');
+            resolve();
             return;
         }
 
@@ -167,12 +176,13 @@ async function extractGPS(file) {
                     resolve();
                 } catch (err) {
                     console.error('[Upload] Error converting DMS to DD:', err);
-                    fallbackToGeolocation().then(resolve);
+                    showToast('Failed to parse GPS data from image.', 'error');
+                    resolve();
                 }
             } else {
                 console.warn('[Upload] No GPS tags found in EXIF');
-                showToast('No GPS data in image. Using current location.', 'info');
-                fallbackToGeolocation().then(resolve);
+                showToast('No GPS data found in image. Location required.', 'error');
+                resolve();
             }
         });
     });
@@ -196,43 +206,38 @@ function convertDMSToDD(dms, ref) {
 }
 
 
-async function fallbackToGeolocation() {
-    if (!navigator.geolocation) {
-        showToast('Location not available', 'error');
-        return;
-    }
 
-    return new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                currentGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                reverseGeocode(currentGPS.lat, currentGPS.lng);
-                resolve();
-            },
-            () => {
-                showToast('Could not get location. Report cannot be saved.', 'error');
-                resolve();
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    });
-}
 
 // ---------- Reverse Geocoding ----------
-function reverseGeocode(lat, lng) {
-    if (!window.google) return;
-    const geocoder = new google.maps.Geocoder();
+async function reverseGeocode(lat, lng) {
+    try {
+        const apiKey = firebaseConfig.apiKey; // Using Firebase config's Google API key, or ENV if available
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
 
-    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        if (status === 'OK' && results && results[0]) {
-            console.log('[Upload] Reverse geocode result:', results[0].formatted_address);
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+            const formattedAddress = data.results[0].formatted_address;
+            console.log('[Upload] Reverse geocode result:', formattedAddress);
+
             const addressEl = document.getElementById('detected-address');
-            if (addressEl) addressEl.textContent = results[0].formatted_address;
-            currentGPS.address = results[0].formatted_address;
+            if (addressEl) addressEl.textContent = formattedAddress;
+
+            if (currentGPS) currentGPS.address = formattedAddress;
+        } else if (data.status === 'REQUEST_DENIED') {
+            console.warn('[Upload] Geocoder failed due to: REQUEST_DENIED. Check API Key restrictions or billing.');
+            const addressEl = document.getElementById('detected-address');
+            if (addressEl) addressEl.textContent = 'Location address unavailable (API Key Issue)';
+            if (currentGPS) currentGPS.address = 'Location address unavailable';
         } else {
-            console.warn('[Upload] Geocoder failed due to:', status);
+            console.warn('[Upload] Geocoder failed due to:', data.status);
+            const addressEl = document.getElementById('detected-address');
+            if (addressEl) addressEl.textContent = 'Location address unavailable';
         }
-    });
+    } catch (err) {
+        console.error('[Upload] Geocoding fetch error:', err);
+    }
 }
 
 // ---------- Detection Result Handler ----------
@@ -242,8 +247,10 @@ function handleDetectionResult(data) {
     const resultEl = document.getElementById('detection-result');
 
     if (detections && detections.length > 0) {
-        detectionResult = detections[0]; // Best detection
-        drawBoundingBoxes(detections);
+        const uniqueLabels = [...new Set(detections.map(d => d.label))].join(', ');
+        detectionResult = { ...detections[0], label: uniqueLabels }; // Store combined labels for saving
+
+        drawBoundingBoxes(detections); // Uses original detections array for boxes
 
         if (resultEl) {
             resultEl.innerHTML = `
@@ -251,13 +258,21 @@ function handleDetectionResult(data) {
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-          <span class="font-semibold">${detectionResult.label}</span>
-          <span class="text-dark-400 text-sm">(${(detectionResult.score * 100).toFixed(1)}%)</span>
+          <span class="font-semibold">${uniqueLabels}</span>
         </div>`;
         }
 
-        // Show save button if GPS is also present
-        if (currentGPS) showSaveButton();
+        showSaveButton();
+        const btn = document.getElementById('save-report-btn');
+        if (btn) {
+            if (!currentGPS) {
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.title = "Cannot save image without location data. Please enable location permissions in your camera next time.";
+            } else {
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.title = "";
+            }
+        }
     } else {
         if (resultEl) {
             resultEl.innerHTML = `
@@ -276,27 +291,40 @@ function drawBoundingBoxes(detections) {
     canvas.height = preview.naturalHeight;
     const ctx = canvas.getContext('2d');
 
+    // Dynamically scale line width and font size for large images
+    const scaleFactor = Math.max(preview.naturalWidth / 600, 1);
+
     detections.forEach((det) => {
         const [x, y, w, h] = det.bbox;
         ctx.strokeStyle = '#22c55e';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4 * scaleFactor;
         ctx.strokeRect(x, y, w, h);
 
         // Label
         ctx.fillStyle = '#22c55e';
-        ctx.font = 'bold 14px Inter';
+        const fontSize = Math.floor(16 * scaleFactor);
+        ctx.font = `bold ${fontSize}px Inter`;
         const label = `${det.label} ${(det.score * 100).toFixed(0)}%`;
         const textWidth = ctx.measureText(label).width;
-        ctx.fillRect(x, y - 22, textWidth + 8, 22);
+
+        const padX = 8 * scaleFactor;
+        const padY = 6 * scaleFactor;
+        const boxHeight = fontSize + padY * 2;
+
+        ctx.fillRect(x, y - boxHeight, textWidth + padX * 2, boxHeight);
         ctx.fillStyle = '#fff';
-        ctx.fillText(label, x + 4, y - 6);
+        ctx.fillText(label, x + padX, y - padY);
     });
 }
 
 // ---------- Save Report ----------
 async function saveReport() {
-    if (!detectionResult || !currentGPS) {
-        showToast('Cannot save: missing detection or GPS data', 'error');
+    if (!detectionResult) {
+        showToast('Cannot save: missing detection data', 'error');
+        return;
+    }
+    if (!currentGPS) {
+        showToast('Cannot save image without location data. Please enable location permissions in your camera next time.', 'error');
         return;
     }
 
@@ -313,15 +341,37 @@ async function saveReport() {
     }
 
     try {
-        // Save to Firestore (image URL will be handled separately when storage is configured)
-        await addDoc(collection(db, 'reports'), {
-            hazardType: detectionResult.label,
-            date: serverTimestamp(),
-            coordinate: { lat: currentGPS.lat, lng: currentGPS.lng },
-            address: currentGPS.address || '',
-            imageUrl: '', // TODO: Add image storage solution
-            reportedBy: user.uid,
-            status: 'open',
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const yy = String(now.getFullYear()).slice(-2);
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const formattedDate = `${dd}/${mm}/${yy} ${hh}:${min}`;
+
+        // Save to Firestore with auto-incremented ID
+        const counterRef = doc(db, 'metadata', 'reportCounter');
+        const newReportRef = doc(collection(db, 'reports'));
+
+        await runTransaction(db, async (transaction) => {
+            const counterDoc = await transaction.get(counterRef);
+            let nextId = 1;
+            if (counterDoc.exists()) {
+                nextId = (counterDoc.data().count || 0) + 1;
+            }
+
+            transaction.set(counterRef, { count: nextId });
+
+            transaction.set(newReportRef, {
+                id: nextId,
+                hazardType: detectionResult.label,
+                date: formattedDate,
+                coordinate: new GeoPoint(currentGPS.lat, currentGPS.lng),
+                address: currentGPS.address || '',
+                imageUrl: '', // TODO: Add image storage solution
+                reportedBy: user.displayName || user.email || 'Unknown User',
+                status: 'new',
+            });
         });
 
         showToast('Report saved successfully!', 'success');
