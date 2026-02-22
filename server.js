@@ -62,7 +62,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Serve dynamic Firebase config (keeps API keys out of git)
+    // Serve dynamic Firebase config (keys come from Render env vars, never from git)
     if (filePath === '/firebase-config.js') {
         const env = loadEnv();
         const fb = {
