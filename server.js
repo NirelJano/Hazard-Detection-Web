@@ -60,11 +60,29 @@ app.get('/env.js', (req, res) => {
     res.send(`window.ENV = ${JSON.stringify(config)};`);
 });
 
+// Fix MIME type for .webmanifest (Express already handles .js correctly)
+app.use((req, res, next) => {
+    if (req.path.endsWith('.webmanifest')) {
+        res.setHeader('Content-Type', 'application/manifest+json');
+    }
+    next();
+});
+
 // Serve static files from current directory
 app.use(express.static(__dirname));
 
-// Catch-all route for SPA navigation (must be after other routes/middlewares)
+// Catch-all route for SPA navigation
+// Static asset extensions (non-HTML) that are not found should return 404,
+// NOT index.html – otherwise the browser gets HTML where it expects JS/CSS
+// and throws: Uncaught SyntaxError: Unexpected token '<'
+const STATIC_ASSET_RE = /\.(js|mjs|css|json|webmanifest|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|mp4|webm|map)$/i;
+
 app.get(/^.*$/, (req, res) => {
+    if (STATIC_ASSET_RE.test(req.path)) {
+        // Return a clear 404 for missing static assets
+        return res.status(404).type('text/plain').send(`404 – Not Found: ${req.path}`);
+    }
+    // HTML navigation – serve the SPA shell
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
