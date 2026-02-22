@@ -172,7 +172,6 @@ async function extractGPS(file) {
                     const longitude = convertDMSToDD(lng, lngRef);
                     currentGPS = { lat: latitude, lng: longitude };
                     console.log('[Upload] Successfully extracted GPS:', currentGPS);
-                    reverseGeocode(latitude, longitude);
                     resolve();
                 } catch (err) {
                     console.error('[Upload] Error converting DMS to DD:', err);
@@ -208,37 +207,7 @@ function convertDMSToDD(dms, ref) {
 
 
 
-// ---------- Reverse Geocoding ----------
-async function reverseGeocode(lat, lng) {
-    try {
-        const apiKey = firebaseConfig.apiKey; // Using Firebase config's Google API key, or ENV if available
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.status === 'OK' && data.results && data.results.length > 0) {
-            const formattedAddress = data.results[0].formatted_address;
-            console.log('[Upload] Reverse geocode result:', formattedAddress);
-
-            const addressEl = document.getElementById('detected-address');
-            if (addressEl) addressEl.textContent = formattedAddress;
-
-            if (currentGPS) currentGPS.address = formattedAddress;
-        } else if (data.status === 'REQUEST_DENIED') {
-            console.warn('[Upload] Geocoder failed due to: REQUEST_DENIED. Check API Key restrictions or billing.');
-            const addressEl = document.getElementById('detected-address');
-            if (addressEl) addressEl.textContent = 'Location address unavailable (API Key Issue)';
-            if (currentGPS) currentGPS.address = 'Location address unavailable';
-        } else {
-            console.warn('[Upload] Geocoder failed due to:', data.status);
-            const addressEl = document.getElementById('detected-address');
-            if (addressEl) addressEl.textContent = 'Location address unavailable';
-        }
-    } catch (err) {
-        console.error('[Upload] Geocoding fetch error:', err);
-    }
-}
 
 // ---------- Detection Result Handler ----------
 function handleDetectionResult(data) {

@@ -5,7 +5,8 @@
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
-        "dev": "node server.js"
+        "dev": "node server.js",
+        "build": "npm install"
     },
     "keywords": [
         "hazard",
@@ -13,5 +14,8 @@
         "pwa",
         "tensorflow"
     ],
-    "license": "ISC"
+    "license": "ISC",
+    "dependencies": {
+        "express": "^5.2.1"
+    }
 }

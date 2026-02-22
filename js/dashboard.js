@@ -14,14 +14,11 @@ import {
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js';
 
 let unsubscribe = null; // Firestore listener
-let map = null;
-let markers = [];
 
 export function init() {
     setupLogout();
     setupImageModal();
     loadReports();
-    initMap();
 }
 
 // ---------- Logout ----------
@@ -40,22 +37,7 @@ function setupLogout() {
     }
 }
 
-// ---------- Google Map ----------
-function initMap() {
-    const mapContainer = document.getElementById('map-container');
-    if (!mapContainer || !window.google) {
-        console.warn('[Dashboard] Google Maps not loaded yet');
-        return;
-    }
 
-    map = new google.maps.Map(mapContainer, {
-        center: { lat: 32.0853, lng: 34.7818 }, // Tel Aviv default
-        zoom: 12,
-        styles: getMapDarkStyle(),
-        disableDefaultUI: true,
-        zoomControl: true,
-    });
-}
 
 // ---------- Firestore Real-time Listener ----------
 function loadReports() {
@@ -131,8 +113,6 @@ function loadReports() {
             }
         }
 
-        // Update map markers
-        updateMapMarkers(reports);
     }, (err) => {
         console.error('[Dashboard] Firestore listener error:', err);
     });
@@ -197,71 +177,4 @@ function setupImageModal() {
     }
 }
 
-// ---------- Map Markers ----------
-function updateMapMarkers(reports) {
-    if (!map) return;
 
-    // Clear old markers
-    markers.forEach((m) => m.setMap(null));
-    markers = [];
-
-    reports.forEach((r) => {
-        if (!r.coordinate) return;
-        const lat = r.coordinate.lat || r.coordinate.latitude;
-        const lng = r.coordinate.lng || r.coordinate.longitude;
-        if (!lat || !lng) return;
-
-        const marker = new google.maps.Marker({
-            position: { lat, lng },
-            map,
-            title: r.hazardType || 'Hazard',
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: getStatusColor(r.status),
-                fillOpacity: 0.9,
-                strokeColor: '#fff',
-                strokeWeight: 2,
-            },
-        });
-
-        const infoWindow = new google.maps.InfoWindow({
-            content: `
-        <div style="color:#1e293b;font-family:Inter,sans-serif;max-width:200px">
-          <strong>${r.hazardType}</strong><br/>
-          <span style="font-size:12px;color:#64748b">${r.address || ''}</span>
-        </div>`,
-        });
-
-        marker.addListener('click', () => infoWindow.open(map, marker));
-        markers.push(marker);
-    });
-
-    // Fit bounds if there are markers
-    if (markers.length > 0) {
-        const bounds = new google.maps.LatLngBounds();
-        markers.forEach((m) => bounds.extend(m.getPosition()));
-        map.fitBounds(bounds, 60);
-    }
-}
-
-function getStatusColor(status) {
-    switch (status) {
-        case 'fixed': return '#22c55e';
-        case 'in-progress': return '#f59e0b';
-        default: return '#ef4444';
-    }
-}
-
-// ---------- Dark Map Style ----------
-function getMapDarkStyle() {
-    return [
-        { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
-        { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
-        { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
-        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
-        { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-        { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    ];
-}

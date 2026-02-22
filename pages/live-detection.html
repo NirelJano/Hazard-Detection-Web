@@ -89,19 +89,3 @@
         </div>
     </nav>
 </div>
-
-<!-- Google Maps API Dynamic Loader (Reverse Geocoding) -->
-<script>
-    (function () {
-        const apiKey = window.ENV?.GOOGLE_MAPS_API_KEY;
-        if (apiKey && apiKey !== 'YOUR_GOOGLE_MAPS_API_KEY') {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geocoding`;
-            script.async = true;
-            script.defer = true;
-            document.head.appendChild(script);
-        } else {
-            console.warn('[Live] Google Maps API key is missing.');
-        }
-    })();
-</script>

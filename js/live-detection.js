@@ -328,15 +328,7 @@ async function autoSaveReport(track) {
     }
 
     try {
-        // Reverse geocode
         let address = '';
-        if (window.google) {
-            try {
-                const geocoder = new google.maps.Geocoder();
-                const res = await geocoder.geocode({ location: gps });
-                if (res.results?.[0]) address = res.results[0].formatted_address;
-            } catch { /* continue without address */ }
-        }
 
         // Save to Firestore
         const now = new Date();

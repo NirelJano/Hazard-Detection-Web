@@ -2,29 +2,14 @@
 // Node.js Development Server
 // ============================================
 
-const http = require('http');
-const fs = require('fs');
+const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
+const app = express();
 const PORT = process.env.PORT || 3000;
 
-const MIME_TYPES = {
-    '.html': 'text/html',
-    '.css': 'text/css',
-    '.js': 'application/javascript',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.webp': 'image/webp',
-    '.ico': 'image/x-icon',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-};
-
-// Simple .env parser
+// Simple .env parser for local development fallback
 function loadEnv() {
     const envPath = path.join(__dirname, '.env');
     const env = {};
@@ -45,95 +30,47 @@ function loadEnv() {
     return env;
 }
 
-const server = http.createServer((req, res) => {
-    // Remove query strings
-    let filePath = req.url.split('?')[0];
+// Serve dynamic environment variables to the frontend
+app.get('/env.js', (req, res) => {
+    const env = loadEnv();
+    const config = {
+        // Cloudinary config
+        CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || env.CLOUDINARY_CLOUD_NAME || '',
+        CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET || env.CLOUDINARY_UPLOAD_PRESET || '',
 
-    // Serve dynamic env config
-    if (filePath === '/env.js') {
-        const env = loadEnv();
-        const config = {
-            GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || '',
-            CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || env.CLOUDINARY_CLOUD_NAME || '',
-            CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET || env.CLOUDINARY_UPLOAD_PRESET || '',
-        };
-        res.writeHead(200, { 'Content-Type': 'application/javascript' });
-        res.end(`window.ENV = ${JSON.stringify(config)};`);
-        return;
-    }
+        // Firebase config
+        FIREBASE_API_KEY: process.env.FIREBASE_API_KEY || env.FIREBASE_API_KEY || '',
+        FIREBASE_AUTH_DOMAIN: process.env.FIREBASE_AUTH_DOMAIN || env.FIREBASE_AUTH_DOMAIN || '',
+        FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || env.FIREBASE_PROJECT_ID || '',
+        FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET || env.FIREBASE_STORAGE_BUCKET || '',
+        FIREBASE_MESSAGING_SENDER_ID: process.env.FIREBASE_MESSAGING_SENDER_ID || env.FIREBASE_MESSAGING_SENDER_ID || '',
+        FIREBASE_APP_ID: process.env.FIREBASE_APP_ID || env.FIREBASE_APP_ID || '',
+        FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID || env.FIREBASE_MEASUREMENT_ID || '',
 
-    // Serve dynamic Firebase config (keys come from Render env vars, never from git)
-    if (filePath === '/firebase-config.js') {
-        const env = loadEnv();
-        const fb = {
-            apiKey: process.env.FIREBASE_API_KEY || env.FIREBASE_API_KEY || '',
-            authDomain: process.env.FIREBASE_AUTH_DOMAIN || env.FIREBASE_AUTH_DOMAIN || '',
-            projectId: process.env.FIREBASE_PROJECT_ID || env.FIREBASE_PROJECT_ID || '',
-            storageBucket: process.env.FIREBASE_STORAGE_BUCKET || env.FIREBASE_STORAGE_BUCKET || '',
-            messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || env.FIREBASE_MESSAGING_SENDER_ID || '',
-            appId: process.env.FIREBASE_APP_ID || env.FIREBASE_APP_ID || '',
-            measurementId: process.env.FIREBASE_MEASUREMENT_ID || env.FIREBASE_MEASUREMENT_ID || '',
-        };
-        const script = `
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
-import { getAnalytics } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-analytics.js';
+        // Maps config
+        GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || ''
+    };
 
-const firebaseConfig = ${JSON.stringify(fb, null, 4)};
+    // Disable caching for env vars
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const analytics = getAnalytics(app);
-
-export { app, auth, db, analytics, onAuthStateChanged, firebaseConfig };
-`;
-        res.writeHead(200, { 'Content-Type': 'application/javascript' });
-        res.end(script);
-        return;
-    }
-
-    // Default to index.html
-    if (filePath === '/') filePath = '/index.html';
-
-    const fullPath = path.join(__dirname, filePath);
-    const ext = path.extname(fullPath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-    fs.readFile(fullPath, (err, data) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                // SPA fallback: serve index.html for missing routes
-                fs.readFile(path.join(__dirname, 'index.html'), (err2, indexData) => {
-                    if (err2) {
-                        res.writeHead(500);
-                        res.end('Server Error');
-                        return;
-                    }
-                    res.writeHead(200, { 'Content-Type': 'text/html' });
-                    res.end(indexData);
-                });
-            } else {
-                res.writeHead(500);
-                res.end('Server Error');
-            }
-            return;
-        }
-
-        // Disable caching globally to force updates
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('Surrogate-Control', 'no-store');
-
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(data);
-    });
+    res.type('application/javascript');
+    res.send(`window.ENV = ${JSON.stringify(config)};`);
 });
 
-server.listen(PORT, () => {
+// Serve static files from current directory
+app.use(express.static(__dirname));
+
+// Catch-all route for SPA navigation (must be after other routes/middlewares)
+app.get(/^.*$/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.listen(PORT, () => {
     console.log(`\n  🚀 Hazard Detection Web`);
+    console.log(`  ➜ Port:    ${PORT}`);
     console.log(`  ➜ Local:   http://localhost:${PORT}`);
-    console.log(`  ➜ Press Ctrl+C to stop\n`);
+    console.log(`  ➜ Env vars enabled dynamically\n`);
 });
