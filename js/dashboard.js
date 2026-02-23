@@ -19,6 +19,12 @@ export function init() {
     setupLogout();
     setupImageModal();
     loadReports();
+
+    if (window.isGovmapLoaded) {
+        initMap();
+    } else {
+        document.addEventListener('govmap_ready', initMap, { once: true });
+    }
 }
 
 // ---------- Logout ----------
@@ -38,6 +44,28 @@ function setupLogout() {
 }
 
 
+
+// ---------- Govmap (מפ"י) Map ----------
+function initMap() {
+    const gmap = window.govmap;
+
+    if (typeof gmap === 'undefined') {
+        console.error('[Dashboard] Govmap SDK was expected to be loaded but is not.');
+        return;
+    }
+
+    try {
+        gmap.createMap('map', {
+            token: '9a416d69-ade2-4809-906d-006325501865',
+            center: { x: 180000, y: 660000 },
+            zoomLevel: 10,
+            layers: ['STREET_LABELS']
+        });
+        console.log('[Dashboard] Govmap map initialized');
+    } catch (err) {
+        console.error('[Dashboard] Govmap initialization error:', err);
+    }
+}
 
 // ---------- Firestore Real-time Listener ----------
 function loadReports() {

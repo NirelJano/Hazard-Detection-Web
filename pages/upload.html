@@ -18,17 +18,33 @@
         <!-- Stacked Layout - Centered Column -->
         <div class="max-w-2xl mx-auto space-y-6 w-full">
 
-            <!-- Upload Area -->
-            <div id="upload-area"
-                class="glass-card border-2 border-dashed border-dark-600 hover:border-primary-500 transition-colors cursor-pointer p-8 md:p-12 text-center animate-fade-in">
-                <svg class="w-12 h-12 md:w-16 md:h-16 mx-auto text-dark-500 mb-3" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p class="text-dark-300 font-medium text-sm md:text-base">Tap to upload or drag & drop</p>
-                <p class="text-dark-500 text-xs md:text-sm mt-1">Supports JPG, PNG, WebP</p>
-                <input id="file-input" type="file" accept="image/*" class="hidden" />
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                <!-- Camera Upload -->
+                <div id="camera-upload-btn"
+                    class="glass-card border-2 border-dashed border-dark-600 hover:border-primary-500 transition-colors cursor-pointer p-6 md:p-8 text-center flex flex-col items-center justify-center min-h-[160px]">
+                    <svg class="w-10 h-10 md:w-12 md:h-12 text-dark-500 mb-3" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <p class="text-dark-300 font-medium text-sm md:text-base">Take Photo</p>
+                    <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" />
+                </div>
+
+                <!-- Gallery Upload -->
+                <div id="gallery-upload-btn"
+                    class="glass-card border-2 border-dashed border-dark-600 hover:border-primary-500 transition-colors cursor-pointer p-6 md:p-8 text-center flex flex-col items-center justify-center min-h-[160px]">
+                    <svg class="w-10 h-10 md:w-12 md:h-12 text-dark-500 mb-3" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p class="text-dark-300 font-medium text-sm md:text-base">Upload from Gallery</p>
+                    <p class="text-dark-500 text-xs mt-1">Supports JPG, PNG, WebP</p>
+                    <input id="gallery-input" type="file" accept="image/*" class="hidden" />
+                </div>
             </div>
 
             <!-- Preview & Location Wrapper -->

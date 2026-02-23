@@ -53,34 +53,47 @@ function setupWorker() {
 
 // ---------- File Upload ----------
 function setupUpload() {
-    const fileInput = document.getElementById('file-input');
-    const uploadArea = document.getElementById('upload-area');
+    const cameraBtn = document.getElementById('camera-upload-btn');
+    const galleryBtn = document.getElementById('gallery-upload-btn');
+    const cameraInput = document.getElementById('camera-input');
+    const galleryInput = document.getElementById('gallery-input');
     const saveBtn = document.getElementById('save-report-btn');
 
-    if (uploadArea) {
-        uploadArea.addEventListener('click', () => fileInput?.click());
+    if (cameraBtn) {
+        cameraBtn.addEventListener('click', () => cameraInput?.click());
+    }
+    if (galleryBtn) {
+        galleryBtn.addEventListener('click', () => galleryInput?.click());
 
-        // Drag & Drop
-        uploadArea.addEventListener('dragover', (e) => {
+        // Drag & Drop for gallery
+        galleryBtn.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('border-primary-500');
+            galleryBtn.classList.add('border-primary-500');
         });
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('border-primary-500');
+        galleryBtn.addEventListener('dragleave', () => {
+            galleryBtn.classList.remove('border-primary-500');
         });
-        uploadArea.addEventListener('drop', (e) => {
+        galleryBtn.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.classList.remove('border-primary-500');
+            galleryBtn.classList.remove('border-primary-500');
             if (e.dataTransfer.files.length > 0) {
-                handleFile(e.dataTransfer.files[0]);
+                handleFile(e.dataTransfer.files[0], false); // Drag & Drop is effectively gallery
             }
         });
     }
 
-    if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
+    if (cameraInput) {
+        cameraInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
+                handleFile(e.target.files[0], true);
+            }
+        });
+    }
+
+    if (galleryInput) {
+        galleryInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0], false);
             }
         });
     }
@@ -91,7 +104,7 @@ function setupUpload() {
 }
 
 // ---------- Process File ----------
-async function handleFile(file) {
+async function handleFile(file, isCamera = false) {
     if (!file.type.startsWith('image/')) {
         showToast('Please upload an image file', 'error');
         return;
@@ -128,7 +141,7 @@ async function handleFile(file) {
         }
 
         // Extract EXIF GPS using exif-js
-        await extractGPS(file);
+        await extractGPS(file, isCamera);
 
         // Wait for model if not ready
         if (!modelReady) {
@@ -146,13 +159,44 @@ async function handleFile(file) {
 }
 
 // ---------- GPS Extraction (exif-js) ----------
-async function extractGPS(file) {
+async function extractGPS(file, isCamera) {
     return new Promise((resolve) => {
-        console.log('[Upload] Starting GPS extraction for:', file.name);
+        console.log('[Upload] Starting GPS extraction for:', file.name, 'isCamera:', isCamera);
+        const fallbackToDeviceLocation = () => {
+            if (!isCamera) {
+                console.warn('[Upload] Image has no EXIF location, and is not a live camera photo.');
+                showToast('No GPS data found in image. Location required.', 'error');
+                resolve();
+                return;
+            }
+            console.log('[Upload] Falling back to device location API');
+            if ('geolocation' in navigator) {
+                showToast('Fetching device location...', 'info');
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentGPS = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        console.log('[Upload] Successfully retrieved device GPS:', currentGPS);
+                        resolve();
+                    },
+                    (error) => {
+                        console.error('[Upload] Device geolocation error:', error);
+                        showToast('Could not fetch device location. Location is required.', 'error');
+                        resolve();
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                showToast('Geolocation not supported by this device/browser.', 'error');
+                resolve();
+            }
+        };
+
         if (typeof EXIF === 'undefined') {
             console.warn('[Upload] EXIF library not loaded, cannot extract GPS');
-            showToast('EXIF library missing. Cannot read location.', 'error');
-            resolve();
+            fallbackToDeviceLocation();
             return;
         }
 
@@ -175,13 +219,11 @@ async function extractGPS(file) {
                     resolve();
                 } catch (err) {
                     console.error('[Upload] Error converting DMS to DD:', err);
-                    showToast('Failed to parse GPS data from image.', 'error');
-                    resolve();
+                    fallbackToDeviceLocation();
                 }
             } else {
                 console.warn('[Upload] No GPS tags found in EXIF');
-                showToast('No GPS data found in image. Location required.', 'error');
-                resolve();
+                fallbackToDeviceLocation();
             }
         });
     });

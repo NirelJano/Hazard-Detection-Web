@@ -51,6 +51,9 @@
   <script src="/env.js"></script>
   <script type="module" src="/firebase-config.js"></script>
 
+  <!-- Govmap (מפ"י) SDK v2 -->
+  <script src="https://www.govmap.gov.il/govmap/api/govmap.api.js"
+    onload="window.isGovmapLoaded = true; document.dispatchEvent(new Event('govmap_ready'));"></script>
 </head>
 
 <body class="bg-dark-950 text-white font-sans min-h-screen">

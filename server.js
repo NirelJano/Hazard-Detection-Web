@@ -47,8 +47,6 @@ app.get('/env.js', (req, res) => {
         FIREBASE_APP_ID: process.env.FIREBASE_APP_ID || env.FIREBASE_APP_ID || '',
         FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID || env.FIREBASE_MEASUREMENT_ID || '',
 
-        // Maps config
-        GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || ''
     };
 
     // Disable caching for env vars

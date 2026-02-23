@@ -81,6 +81,12 @@ window.addEventListener('popstate', (e) => {
 });
 
 // ---------- Auth State Observer ----------
+import('../js/auth.js').then(mod => {
+    if (mod.checkRedirectResult) {
+        mod.checkRedirectResult();
+    }
+}).catch(err => console.error('[App] Failed to load auth module for redirect check', err));
+
 onAuthStateChanged(auth, (user) => {
     const hash = window.location.hash.replace('#', '');
 

@@ -7,7 +7,9 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     GoogleAuthProvider,
+    signInWithRedirect,
     signInWithPopup,
+    getRedirectResult,
     updateProfile,
     sendPasswordResetEmail
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js';
@@ -183,9 +185,28 @@ function setupRegister() {
 async function handleGoogleSignIn() {
     try {
         const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
 
-        // Create user doc if first time
+        // Use redirect on Mobile/PWA, popup on Desktop (to avoid 3rd-party cookie issues locally)
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+        if (isMobile || isStandalone) {
+            await signInWithRedirect(auth, provider);
+        } else {
+            const result = await signInWithPopup(auth, provider);
+            await handleGoogleResult(result);
+        }
+    } catch (err) {
+        console.error('[Auth] Google sign-in error:', err);
+        if (err.code !== 'auth/popup-closed-by-user') {
+            showToast('Google sign-in request failed', 'error');
+        }
+    }
+}
+
+// Helper to save user doc after successful Google auth
+async function handleGoogleResult(result) {
+    if (result && result.user) {
         await setDoc(doc(db, 'users', result.user.uid), {
             username: result.user.displayName || 'Google User',
             email: result.user.email,
@@ -194,11 +215,20 @@ async function handleGoogleSignIn() {
         }, { merge: true });
 
         showToast('Signed in with Google!', 'success');
-    } catch (err) {
-        console.error('[Auth] Google sign-in error:', err);
-        if (err.code !== 'auth/popup-closed-by-user') {
-            showToast('Google sign-in failed', 'error');
+    }
+}
+
+// ---------- Check Redirect Result ----------
+// Call this early in app lifecycle to capture redirect results
+export async function checkRedirectResult() {
+    try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+            await handleGoogleResult(result);
         }
+    } catch (err) {
+        console.error('[Auth] Redirect result error:', err);
+        showToast('Google sign-in failed', 'error');
     }
 }
 
