@@ -2,7 +2,7 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_VERSION = '8'; // Bump version to force cache update
+const CACHE_VERSION = '9'; // Bump version to force cache update
 const CACHE_NAME = 'hazard-detect-v' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   '/',

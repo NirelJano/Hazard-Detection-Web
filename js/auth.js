@@ -186,16 +186,11 @@ async function handleGoogleSignIn() {
     try {
         const provider = new GoogleAuthProvider();
 
-        // Use redirect on Mobile/PWA, popup on Desktop (to avoid 3rd-party cookie issues locally)
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-        if (isMobile || isStandalone) {
-            await signInWithRedirect(auth, provider);
-        } else {
-            const result = await signInWithPopup(auth, provider);
-            await handleGoogleResult(result);
-        }
+        // Always use popup. 
+        // signInWithRedirect fails in PWA standalone mode when hosted on Render (cross-origin authDomain)
+        // often resulting in a stuck auth/handler page and 404 for __/firebase/init.json
+        const result = await signInWithPopup(auth, provider);
+        await handleGoogleResult(result);
     } catch (err) {
         console.error('[Auth] Google sign-in error:', err);
         if (err.code !== 'auth/popup-closed-by-user') {
