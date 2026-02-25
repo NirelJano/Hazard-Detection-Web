@@ -80,7 +80,15 @@ function setupLogin() {
     }
 
     if (googleBtn) {
-        googleBtn.addEventListener('click', handleGoogleSignIn);
+        if (isIosPwa()) {
+            // Hide Google Sign-in and the "or" divider above it
+            googleBtn.style.display = 'none';
+            if (googleBtn.previousElementSibling) {
+                googleBtn.previousElementSibling.style.display = 'none';
+            }
+        } else {
+            googleBtn.addEventListener('click', handleGoogleSignIn);
+        }
     }
 
     const forgotBtn = document.getElementById('forgot-password-link');
@@ -177,7 +185,15 @@ function setupRegister() {
     }
 
     if (googleBtn) {
-        googleBtn.addEventListener('click', handleGoogleSignIn);
+        if (isIosPwa()) {
+            // Hide Google Sign-in and the "or" divider above it
+            googleBtn.style.display = 'none';
+            if (googleBtn.previousElementSibling) {
+                googleBtn.previousElementSibling.style.display = 'none';
+            }
+        } else {
+            googleBtn.addEventListener('click', handleGoogleSignIn);
+        }
     }
 }
 
@@ -236,6 +252,15 @@ function setLoading(form, loading) {
             ? '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>'
             : btn.dataset.label || 'Submit';
     }
+}
+
+function isIosPwa() {
+    // Detect iOS devices
+    const isIos = /macintosh|mac os x|iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    // Detect if running as a PWA (standalone mode)
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+    return isIos && isStandalone;
 }
 
 function friendlyError(code) {
