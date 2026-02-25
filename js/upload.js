@@ -4,6 +4,7 @@
 
 import { auth, db, firebaseConfig } from '../firebase-config.js';
 import { showToast } from './app.js';
+import { reverseGeocode } from './geocode.js';
 import {
     collection,
     doc,
@@ -16,10 +17,20 @@ let currentGPS = null;
 let detectionResult = null;
 let currentFile = null;
 let modelReady = false; // Track if worker model is loaded
+let resolvedAddress = null; // Cached geocoded address
+let isSavingReport = false; // Track active save for beforeunload guard
 
 export function init() {
     setupWorker();
     setupUpload();
+
+    // Warn user if they try to refresh/leave while saving
+    window.addEventListener('beforeunload', (e) => {
+        if (isSavingReport) {
+            e.preventDefault();
+            e.returnValue = ''; // Required for Chrome
+        }
+    });
 }
 
 // ---------- Web Worker ----------
@@ -113,6 +124,7 @@ async function handleFile(file, isCamera = false) {
     // Reset state
     detectionResult = null;
     currentGPS = null;
+    resolvedAddress = null;
     currentFile = file;
     hideSaveButton();
     showLoading();
@@ -161,7 +173,7 @@ async function handleFile(file, isCamera = false) {
 // ---------- GPS Extraction (exif-js) ----------
 async function extractGPS(file, isCamera) {
     return new Promise((resolve) => {
-        console.log('[Upload] Starting GPS extraction for:', file.name, 'isCamera:', isCamera);
+
         const fallbackToDeviceLocation = () => {
             if (!isCamera) {
                 console.warn('[Upload] Image has no EXIF location, and is not a live camera photo.');
@@ -169,7 +181,7 @@ async function extractGPS(file, isCamera) {
                 resolve();
                 return;
             }
-            console.log('[Upload] Falling back to device location API');
+
             if ('geolocation' in navigator) {
                 showToast('Fetching device location...', 'info');
                 navigator.geolocation.getCurrentPosition(
@@ -178,11 +190,11 @@ async function extractGPS(file, isCamera) {
                             lat: position.coords.latitude,
                             lng: position.coords.longitude
                         };
-                        console.log('[Upload] Successfully retrieved device GPS:', currentGPS);
+
                         resolve();
                     },
                     (error) => {
-                        console.error('[Upload] Device geolocation error:', error);
+
                         showToast('Could not fetch device location. Location is required.', 'error');
                         resolve();
                     },
@@ -195,14 +207,14 @@ async function extractGPS(file, isCamera) {
         };
 
         if (typeof EXIF === 'undefined') {
-            console.warn('[Upload] EXIF library not loaded, cannot extract GPS');
+
             fallbackToDeviceLocation();
             return;
         }
 
         EXIF.getData(file, function () {
             const allTags = EXIF.getAllTags(this);
-            console.log('[Upload] All EXIF tags found:', Object.keys(allTags));
+
 
             const lat = EXIF.getTag(this, 'GPSLatitude');
             const lng = EXIF.getTag(this, 'GPSLongitude');
@@ -210,7 +222,7 @@ async function extractGPS(file, isCamera) {
             const lngRef = EXIF.getTag(this, 'GPSLongitudeRef');
 
             if (lat && lng) {
-                console.log('[Upload] Raw GPS data found:', { lat, lng, latRef, lngRef });
+
                 try {
                     const latitude = convertDMSToDD(lat, latRef);
                     const longitude = convertDMSToDD(lng, lngRef);
@@ -222,7 +234,7 @@ async function extractGPS(file, isCamera) {
                     fallbackToDeviceLocation();
                 }
             } else {
-                console.warn('[Upload] No GPS tags found in EXIF');
+
                 fallbackToDeviceLocation();
             }
         });
@@ -282,6 +294,20 @@ function handleDetectionResult(data) {
             } else {
                 btn.classList.remove('opacity-50', 'cursor-not-allowed');
                 btn.title = "";
+
+                // Resolve address from GPS and display it
+                const addressEl = document.getElementById('detected-address');
+                if (addressEl) addressEl.textContent = 'Resolving address...';
+                reverseGeocode(currentGPS.lat, currentGPS.lng)
+                    .then(addr => {
+                        resolvedAddress = addr;
+                        if (addressEl) addressEl.textContent = `📍 ${addr}`;
+                    })
+                    .catch(err => {
+                        console.warn('[Upload] Reverse geocoding failed:', err);
+                        resolvedAddress = null;
+                        if (addressEl) addressEl.textContent = 'Could not resolve address';
+                    });
             }
         }
     } else {
@@ -414,7 +440,15 @@ async function saveReport() {
     }
 
     try {
-        // Create canvas blob and upload to Cloudinary
+        isSavingReport = true;
+        // Use the already-resolved address (geocoded when detection appeared)
+        if (!resolvedAddress) {
+            showToast('Could not resolve address – report not saved', 'error');
+            return;
+        }
+        const address = resolvedAddress;
+
+        // Step 1: Upload image to Cloudinary
         showToast('Uploading image with detection...', 'info');
         const combinedBlob = await getCombinedCanvasBlob();
         const uploadedImageUrl = await uploadToCloudinary(combinedBlob, currentFile.name);
@@ -427,7 +461,8 @@ async function saveReport() {
         const min = String(now.getMinutes()).padStart(2, '0');
         const formattedDate = `${dd}/${mm}/${yy} ${hh}:${min}`;
 
-        // Save to Firestore with auto-incremented ID
+        // Step 2: Save to Firestore
+        showToast('Saving report...', 'info');
         const counterRef = doc(db, 'metadata', 'reportCounter');
         const newReportRef = doc(collection(db, 'reports'));
 
@@ -445,7 +480,7 @@ async function saveReport() {
                 hazardType: detectionResult.label,
                 date: formattedDate,
                 coordinate: new GeoPoint(currentGPS.lat, currentGPS.lng),
-                address: currentGPS.address || '',
+                address: address,
                 imageUrl: uploadedImageUrl,
                 reportedBy: user.displayName || user.email || 'Unknown User',
                 status: 'new',
@@ -480,11 +515,13 @@ async function saveReport() {
             currentFile = null;
             detectionResult = null;
             currentGPS = null;
+            resolvedAddress = null;
         }, 5000);
     } catch (err) {
         console.error('[Upload] Save error:', err);
         showToast('Failed to save report', 'error');
     } finally {
+        isSavingReport = false;
         if (saveBtn) {
             saveBtn.disabled = false;
             saveBtn.innerHTML = '💾 Save Report';

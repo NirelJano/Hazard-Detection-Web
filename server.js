@@ -47,6 +47,8 @@ app.get('/env.js', (req, res) => {
         FIREBASE_APP_ID: process.env.FIREBASE_APP_ID || env.FIREBASE_APP_ID || '',
         FIREBASE_MEASUREMENT_ID: process.env.FIREBASE_MEASUREMENT_ID || env.FIREBASE_MEASUREMENT_ID || '',
 
+        // Mapbox config
+        MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN || env.MAPBOX_ACCESS_TOKEN || '',
     };
 
     // Disable caching for env vars

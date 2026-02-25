@@ -5,6 +5,7 @@
 import { auth, db } from '../firebase-config.js';
 import { showToast } from './app.js';
 import { uploadToCloudinary } from './upload.js';
+import { reverseGeocode } from './geocode.js';
 import {
     collection,
     doc,
@@ -328,9 +329,16 @@ async function autoSaveReport(track) {
     }
 
     try {
-        let address = '';
+        // Reverse-geocode coordinates → address (required)
+        let address;
+        try {
+            address = await reverseGeocode(gps.lat, gps.lng);
+        } catch (geoErr) {
+            console.warn('[Live] Reverse geocoding failed, skipping auto-save:', geoErr);
+            return;
+        }
 
-        // Save to Firestore
+        // Format date
         const now = new Date();
         const dd = String(now.getDate()).padStart(2, '0');
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -367,7 +375,7 @@ async function autoSaveReport(track) {
                 hazardType: track.label,
                 date: formattedDate,
                 coordinate: new GeoPoint(gps.lat, gps.lng),
-                address,
+                address: address,
                 imageUrl: imageUrl,
                 reportedBy: user.displayName || user.email || 'Unknown User',
                 status: 'new',

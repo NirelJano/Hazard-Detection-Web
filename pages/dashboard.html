@@ -49,12 +49,120 @@
                     </div>
                 </section>
 
+                <!-- Filters Section (collapsed by default) -->
+                <section class="filters-section glass-card animate-fade-in" id="filters-section">
+                    <!-- Toggle Button (visible on all screen sizes) -->
+                    <button class="filters-toggle-btn" id="filters-toggle-btn" type="button">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        <span>Filters</span>
+                        <span class="filter-active-badge hidden" id="filter-active-badge">0</span>
+                        <svg class="w-4 h-4 filters-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <!-- Filter Fields -->
+                    <div class="filters-panel" id="filters-panel">
+                        <div class="filters-grid">
+                            <!-- Hazard Type -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-hazard-type">Hazard Type</label>
+                                <select id="filter-hazard-type" class="filter-input">
+                                    <option value="">All Types</option>
+                                </select>
+                            </div>
+                            <!-- Report ID -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-id">Report ID</label>
+                                <input type="text" id="filter-id" class="filter-input" placeholder="e.g. 12" />
+                            </div>
+                            <!-- Location -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-location">Location</label>
+                                <input type="text" id="filter-location" class="filter-input"
+                                    placeholder="Search address..." />
+                            </div>
+                            <!-- Status -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-status">Status</label>
+                                <select id="filter-status" class="filter-input">
+                                    <option value="">All</option>
+                                    <option value="new">New</option>
+                                    <option value="in-progress">In Progress</option>
+                                    <option value="fixed">Fixed</option>
+                                </select>
+                            </div>
+                            <!-- Date From -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-date-from">Date From</label>
+                                <input type="date" id="filter-date-from" class="filter-input" />
+                            </div>
+                            <!-- Date To -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-date-to">Date To</label>
+                                <input type="date" id="filter-date-to" class="filter-input" />
+                            </div>
+                            <!-- Reported By -->
+                            <div class="filter-group">
+                                <label class="filter-label" for="filter-reported-by">Reported By</label>
+                                <input type="text" id="filter-reported-by" class="filter-input"
+                                    placeholder="Username..." />
+                            </div>
+                            <!-- Clear Filters -->
+                            <div class="filter-group filter-group-actions">
+                                <label class="filter-label">&nbsp;</label>
+                                <button id="clear-filters-btn" class="filter-clear-btn" type="button">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Reports List -->
                 <section class="dashboard-section">
                     <h2 class="text-sm font-semibold text-dark-300 mb-2">📋 Recent Reports</h2>
-                    <div id="reports-list" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                    <div id="reports-list" class="space-y-3 overflow-y-auto pr-1">
                         <!-- Reports rendered dynamically -->
                         <div class="text-center py-8 text-dark-500 text-sm">Loading reports...</div>
+                    </div>
+                    <!-- Pagination Controls -->
+                    <div id="pagination-controls" class="pagination-controls hidden">
+                        <div class="pagination-info">
+                            <span id="pagination-info-text">Showing 0-0 of 0</span>
+                        </div>
+                        <div class="pagination-buttons">
+                            <button id="pagination-prev" class="pagination-btn" disabled>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Previous
+                            </button>
+                            <span id="pagination-page-info" class="pagination-page-num">Page 1 / 1</span>
+                            <button id="pagination-next" class="pagination-btn" disabled>
+                                Next
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="pagination-size">
+                            <label for="page-size-select" class="pagination-size-label">Per page:</label>
+                            <select id="page-size-select" class="pagination-size-select">
+                                <option value="25" selected>25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
                     </div>
                 </section>
 
