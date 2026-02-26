@@ -186,17 +186,19 @@ function setupRegister() {
 async function handleGoogleSignIn() {
     try {
         const provider = new GoogleAuthProvider();
-        provider.addScope('email');
-        provider.addScope('profile');
 
-        if (isMobile()) {
-            // Mobile browsers (iOS + Android) often block or break popups.
-            // Use redirect flow instead — page reloads and result is captured in checkRedirectResult().
-            await signInWithRedirect(auth, provider);
-        } else {
-            const result = await signInWithPopup(auth, provider);
-            await handleGoogleResult(result);
+        if (isIosPwa()) {
+            // iOS PWA (Standalone) blocks popups, and cross-domain signInWithRedirect 
+            // fails due to Apple's Intelligent Tracking Prevention (ITP).
+            // Proper fix requires Firebase Hosting with a Custom Domain.
+            showToast('Google Sign-In is not supported in iOS App mode. Please use Email/Password.', 'error');
+            return;
         }
+
+        // Use popup for Desktop, Android, and regular iOS Safari.
+        // This is the most stable method across these environments.
+        const result = await signInWithPopup(auth, provider);
+        await handleGoogleResult(result);
     } catch (err) {
         console.error('[Auth] Google sign-in error:', err);
         if (err.code !== 'auth/popup-closed-by-user') {
@@ -232,22 +234,17 @@ async function handleGoogleResult(result) {
 }
 
 // ---------- Check Redirect Result ----------
-// Called early in app lifecycle to capture Google sign-in redirect results.
-// On mobile, after Google redirects back to the app, Firebase Auth picks up
-// the result here. We then ensure the user doc exists in Firestore.
+// Call this early in app lifecycle to capture redirect results
 export async function checkRedirectResult() {
     try {
         const result = await getRedirectResult(auth);
         if (result && result.user) {
-            console.log('[Auth] Captured redirect result for', result.user.email);
             await handleGoogleResult(result);
         }
     } catch (err) {
         console.error('[Auth] Redirect result error:', err);
-        // Don't show a toast here — onAuthStateChanged will handle navigation.
-        // Only show error if it's a real failure (not just "no pending redirect").
         if (err.code && err.code !== 'auth/no-auth-event') {
-            showToast('Google sign-in failed. Please try again.', 'error');
+            showToast('Google sign-in failed', 'error');
         }
     }
 }
@@ -263,13 +260,13 @@ function setLoading(form, loading) {
     }
 }
 
-function isMobile() {
-    // Detect any mobile/touchscreen device (iOS, Android, tablet in standalone or browser mode)
-    const ua = navigator.userAgent.toLowerCase();
-    const isTouchDevice = /iphone|ipad|ipod|android|mobile|tablet/.test(ua);
-    // Also catch iPads using desktop user agent (iOS 13+)
-    const isIpadDesktopMode = navigator.maxTouchPoints > 1 && /mac os x/.test(ua);
-    return isTouchDevice || isIpadDesktopMode;
+function isIosPwa() {
+    // Detect iOS devices
+    const isIos = /macintosh|mac os x|iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    // Detect if running as a PWA (standalone mode)
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+    return isIos && isStandalone;
 }
 
 function friendlyError(code) {
