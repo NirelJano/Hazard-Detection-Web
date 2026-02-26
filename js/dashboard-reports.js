@@ -116,6 +116,45 @@ export function setupAdminToolbar(isAdmin) {
             if (e.target === deleteModal) closeDeleteModal();
         });
     }
+
+    // Cloudinary Cleanup (Local API)
+    const cleanupBtn = document.getElementById('cleanup-cloudinary-btn');
+    if (cleanupBtn) {
+        cleanupBtn.addEventListener('click', async () => {
+            if (!confirm('This will permanently delete orphaned images from Cloudinary.\n\nNote: This button only works when running the app locally via "node server.js".\n\nContinue?')) return;
+
+            cleanupBtn.disabled = true;
+            const originalText = cleanupBtn.innerHTML;
+            cleanupBtn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Cleaning...';
+
+            try {
+                const res = await fetch('/api/cleanup', { method: 'POST' });
+
+                if (res.status === 404) {
+                    showToast('Cleanup API not found. You must run the app locally via "node server.js"', 'error');
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.deletedCount > 0) {
+                        showToast(`Successfully deleted ${data.deletedCount} orphaned images!`, 'success');
+                    } else {
+                        showToast('All clean! No orphaned images found to delete.', 'info');
+                    }
+                } else {
+                    showToast('Cleanup script failed to run. Check server logs.', 'error');
+                }
+            } catch (err) {
+                console.error('[Admin] Cleanup error:', err);
+                showToast('Network error while running cleanup script.', 'error');
+            } finally {
+                cleanupBtn.disabled = false;
+                cleanupBtn.innerHTML = originalText;
+            }
+        });
+    }
 }
 
 // ---------- Modal Helpers ----------

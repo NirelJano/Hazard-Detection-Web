@@ -59,6 +59,7 @@ function setupLogout() {
 
 // ---------- Admin Role Detection ----------
 async function detectAdminRole() {
+    isAdmin = false; // Reset role on every auth check to prevent SPA state leaks
     const user = auth.currentUser;
     if (!user) return;
     try {

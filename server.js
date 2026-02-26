@@ -60,6 +60,28 @@ app.get('/env.js', (req, res) => {
     res.send(`window.ENV = ${JSON.stringify(config)};`);
 });
 
+// Admin API: Run Cloudinary cleanup script (Only works when running server.js locally)
+app.post('/api/cleanup', (req, res) => {
+    const { exec } = require('child_process');
+
+    console.log('[API] Running orphaned images cleanup...');
+    const scriptPath = path.join(__dirname, 'admin-tools');
+
+    exec('npm run cleanup', { cwd: scriptPath }, (error, stdout, stderr) => {
+        if (error) {
+            console.error('[API] Cleanup error:', error);
+            console.error(stderr);
+            return res.status(500).json({ success: false, error: 'Failed to run cleanup' });
+        }
+
+        const match = stdout.match(/Successfully deleted:\s*(\d+)/);
+        const deletedCount = match ? parseInt(match[1]) : 0;
+
+        console.log(`[API] Cleanup finished. Deleted ${deletedCount} images.`);
+        res.json({ success: true, deletedCount, logs: stdout });
+    });
+});
+
 // Fix MIME type for .webmanifest (Express already handles .js correctly)
 app.use((req, res, next) => {
     if (req.path.endsWith('.webmanifest')) {

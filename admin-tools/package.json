@@ -1,0 +1,14 @@
+{
+    "name": "hazard-admin-tools",
+    "version": "1.0.0",
+    "description": "Local tools for managing the Hazard Detection Web project",
+    "main": "cleanup.js",
+    "scripts": {
+        "cleanup": "node cleanup.js"
+    },
+    "dependencies": {
+        "cloudinary": "^2.5.1",
+        "dotenv": "^16.4.5",
+        "firebase-admin": "^12.1.0"
+    }
+}

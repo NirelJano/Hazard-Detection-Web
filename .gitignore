@@ -35,3 +35,7 @@ firebase-debug.log*
 # Python
 venv*/
 *.npy
+
+# Admin Tools
+admin-tools/serviceAccountKey.json
+admin-tools/node_modules/
