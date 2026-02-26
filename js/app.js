@@ -81,32 +81,36 @@ window.addEventListener('popstate', (e) => {
 });
 
 // ---------- Auth State Observer ----------
-import('../js/auth.js').then(mod => {
+// Run checkRedirectResult FIRST to handle any pending Google redirect.
+// Then set up the auth state observer so navigation waits for user doc to be saved.
+import('../js/auth.js').then(async mod => {
+    // Capture redirect result (if any) before listening to auth state.
+    // This ensures the Firestore user doc is saved before onAuthStateChanged fires.
     if (mod.checkRedirectResult) {
-        mod.checkRedirectResult();
+        await mod.checkRedirectResult();
     }
-}).catch(err => console.error('[App] Failed to load auth module for redirect check', err));
 
-onAuthStateChanged(auth, (user) => {
-    const hash = window.location.hash.replace('#', '');
+    onAuthStateChanged(auth, (user) => {
+        const hash = window.location.hash.replace('#', '');
 
-    if (user) {
-        // User is signed in – go to requested page or dashboard
-        const protectedRoutes = ['dashboard', 'upload', 'live-detection', 'settings'];
-        if (protectedRoutes.includes(hash)) {
-            navigateTo(hash);
+        if (user) {
+            // User is signed in – go to requested page or dashboard
+            const protectedRoutes = ['dashboard', 'upload', 'live-detection', 'settings'];
+            if (protectedRoutes.includes(hash)) {
+                navigateTo(hash);
+            } else {
+                navigateTo('dashboard');
+            }
         } else {
-            navigateTo('dashboard');
+            // Not signed in – show login (allow register too)
+            if (hash === 'register') {
+                navigateTo('register');
+            } else {
+                navigateTo('login');
+            }
         }
-    } else {
-        // Not signed in – show login (allow register too)
-        if (hash === 'register') {
-            navigateTo('register');
-        } else {
-            navigateTo('login');
-        }
-    }
-});
+    });
+}).catch(err => console.error('[App] Failed to initialize auth', err));
 
 // ---------- Global Helpers ----------
 

@@ -2,8 +2,15 @@
 // Dashboard Reports Module (Log + Pagination)
 // ============================================
 
+import { db } from '../firebase-config.js';
 import { updateMapMarkers, flyToReport } from './dashboard-map.js';
 import { applyFilters, updateFilterBadge } from './dashboard-filters.js';
+import {
+    doc,
+    writeBatch,
+    updateDoc
+} from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
+import { showToast } from './app.js';
 
 let allReports = [];         // All reports from Firestore (unfiltered)
 export let currentReports = [];     // Currently displayed (filtered) reports
@@ -11,6 +18,10 @@ export let currentReports = [];     // Currently displayed (filtered) reports
 // ---------- Pagination State ----------
 let currentPage = 1;
 let pageSize = 25;
+
+// ---------- Admin State ----------
+let _isAdmin = false;
+let selectedIds = new Set();   // Set of report docIds currently checked
 
 // Helper: resolve image URL for display (handles 'uploading' placeholder)
 export function getDisplayImageUrl(imageUrl) {
@@ -22,6 +33,199 @@ export function setAllReports(reports) {
     allReports = reports;
 }
 
+// ---------- Admin Toolbar Setup ----------
+export function setupAdminToolbar(isAdmin) {
+    _isAdmin = isAdmin;
+    const toolbar = document.getElementById('admin-toolbar');
+    if (!toolbar) return;
+
+    if (!isAdmin) {
+        toolbar.classList.add('hidden');
+        return;
+    }
+
+    toolbar.classList.remove('hidden');
+
+    // Bulk status change
+    const bulkStatusBtn = document.getElementById('bulk-status-btn');
+    const bulkStatusSelect = document.getElementById('bulk-status-select');
+    const applyStatusBtn = document.getElementById('apply-status-btn');
+    const cancelStatusBtn = document.getElementById('cancel-status-btn');
+
+    if (bulkStatusBtn && bulkStatusSelect) {
+        bulkStatusBtn.addEventListener('click', () => {
+            if (selectedIds.size === 0) {
+                showToast('Select at least one report first', 'info');
+                return;
+            }
+            bulkStatusSelect.classList.toggle('hidden');
+            if (applyStatusBtn) applyStatusBtn.classList.toggle('hidden');
+            if (cancelStatusBtn) cancelStatusBtn.classList.toggle('hidden');
+        });
+
+        if (applyStatusBtn) {
+            applyStatusBtn.addEventListener('click', async () => {
+                const newStatus = bulkStatusSelect.value;
+                if (!newStatus) return;
+                await bulkUpdateStatus(newStatus);
+                bulkStatusSelect.classList.add('hidden');
+                applyStatusBtn.classList.add('hidden');
+                if (cancelStatusBtn) cancelStatusBtn.classList.add('hidden');
+            });
+        }
+
+        if (cancelStatusBtn) {
+            cancelStatusBtn.addEventListener('click', () => {
+                bulkStatusSelect.classList.add('hidden');
+                applyStatusBtn.classList.add('hidden');
+                cancelStatusBtn.classList.add('hidden');
+            });
+        }
+    }
+
+    // Bulk delete button → open confirmation modal
+    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', () => {
+            if (selectedIds.size === 0) {
+                showToast('Select at least one report first', 'info');
+                return;
+            }
+            openDeleteModal();
+        });
+    }
+
+    // Confirmation modal buttons
+    const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+    const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+    const deleteModal = document.getElementById('delete-confirm-modal');
+
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', async () => {
+            closeDeleteModal();
+            await bulkDelete();
+        });
+    }
+
+    if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
+    }
+
+    if (deleteModal) {
+        deleteModal.addEventListener('click', (e) => {
+            if (e.target === deleteModal) closeDeleteModal();
+        });
+    }
+}
+
+// ---------- Modal Helpers ----------
+function openDeleteModal() {
+    const modal = document.getElementById('delete-confirm-modal');
+    const countSpan = document.getElementById('delete-count');
+    if (countSpan) countSpan.textContent = selectedIds.size;
+    if (modal) {
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => modal.classList.remove('opacity-0'));
+    }
+}
+
+function closeDeleteModal() {
+    const modal = document.getElementById('delete-confirm-modal');
+    if (modal) {
+        modal.classList.add('opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+}
+
+// ---------- Bulk Operations ----------
+async function bulkUpdateStatus(newStatus) {
+    if (selectedIds.size === 0) return;
+    try {
+        const batch = writeBatch(db);
+        selectedIds.forEach(docId => {
+            batch.update(doc(db, 'reports', docId), { status: newStatus });
+        });
+        await batch.commit();
+        showToast(`Updated ${selectedIds.size} report(s) to "${newStatus}"`, 'success');
+        clearSelection();
+    } catch (err) {
+        console.error('[Admin] Bulk status update error:', err);
+        showToast('Failed to update status', 'error');
+    }
+}
+
+async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    try {
+        const batch = writeBatch(db);
+        selectedIds.forEach(docId => {
+            batch.delete(doc(db, 'reports', docId));
+        });
+        await batch.commit();
+        showToast(`Deleted ${count} report(s)`, 'success');
+        clearSelection();
+    } catch (err) {
+        console.error('[Admin] Bulk delete error:', err);
+        showToast('Failed to delete reports', 'error');
+    }
+}
+
+function clearSelection() {
+    selectedIds.clear();
+    updateToolbarState();
+    // Uncheck all visible checkboxes
+    document.querySelectorAll('.report-row-checkbox').forEach(cb => cb.checked = false);
+    const selectAll = document.getElementById('select-all-checkbox');
+    if (selectAll) selectAll.checked = false;
+}
+
+function updateToolbarState() {
+    const countBadge = document.getElementById('selected-count-badge');
+    const deleteBtn = document.getElementById('delete-selected-btn');
+    const statusBtn = document.getElementById('bulk-status-btn');
+
+    if (countBadge) {
+        countBadge.textContent = selectedIds.size > 0 ? `${selectedIds.size} selected` : '';
+        countBadge.classList.toggle('hidden', selectedIds.size === 0);
+    }
+
+    const hasSelection = selectedIds.size > 0;
+    if (deleteBtn) deleteBtn.disabled = !hasSelection;
+    if (statusBtn) statusBtn.disabled = !hasSelection;
+}
+
+// ---------- Checkbox Logic ----------
+function handleSelectAll(checked) {
+    const checkboxes = document.querySelectorAll('.report-row-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checked;
+        const docId = cb.dataset.docId;
+        if (docId) {
+            if (checked) selectedIds.add(docId);
+            else selectedIds.delete(docId);
+        }
+    });
+    updateToolbarState();
+}
+
+function handleRowCheckbox(cb) {
+    const docId = cb.dataset.docId;
+    if (!docId) return;
+    if (cb.checked) selectedIds.add(docId);
+    else selectedIds.delete(docId);
+
+    // Update select-all state
+    const allBoxes = document.querySelectorAll('.report-row-checkbox');
+    const selectAll = document.getElementById('select-all-checkbox');
+    if (selectAll && allBoxes.length > 0) {
+        selectAll.checked = [...allBoxes].every(b => b.checked);
+        selectAll.indeterminate = !selectAll.checked && [...allBoxes].some(b => b.checked);
+    }
+    updateToolbarState();
+}
+
+// ---------- Render ----------
 export function renderFilteredReports(resetPage = true) {
     const filtered = applyFilters(allReports);
     currentReports = filtered;
@@ -69,13 +273,20 @@ export function renderFilteredReports(resetPage = true) {
             <p class="text-sm mt-1">Try adjusting or clearing your filters</p>
           </div>`;
         } else {
+            // Build colgroup — admin gets extra checkbox column
+            const adminCol = _isAdmin ? `<col style="width: 4%">` : '';
+            const adminTh = _isAdmin
+                ? `<th class="report-cell-checkbox"><input type="checkbox" id="select-all-checkbox" class="admin-checkbox" title="Select all"></th>`
+                : '';
+
             reportsList.innerHTML = `
                 <div class="w-full overflow-x-auto">
                     <table class="reports-table">
                         <colgroup>
-                            <col style="width: 14%">
+                            ${adminCol}
+                            <col style="width: ${_isAdmin ? '13%' : '14%'}">
                             <col style="width: 12%">
-                            <col style="width: 25%">
+                            <col style="width: ${_isAdmin ? '22%' : '25%'}">
                             <col style="width: 15%">
                             <col style="width: 8%">
                             <col style="width: 12%">
@@ -83,6 +294,7 @@ export function renderFilteredReports(resetPage = true) {
                         </colgroup>
                         <thead>
                             <tr class="reports-table-header">
+                                ${adminTh}
                                 <th>ID</th>
                                 <th>Hazard Type</th>
                                 <th>Location</th>
@@ -112,6 +324,31 @@ export function renderFilteredReports(resetPage = true) {
                     flyToReport(reportId, currentReports);
                 });
             });
+
+            // Admin: wire checkboxes
+            if (_isAdmin) {
+                const selectAllCb = document.getElementById('select-all-checkbox');
+                if (selectAllCb) {
+                    selectAllCb.addEventListener('change', () => handleSelectAll(selectAllCb.checked));
+                    // Restore indeterminate state for already-selected rows on re-render
+                }
+
+                document.querySelectorAll('.report-row-checkbox').forEach(cb => {
+                    // Restore checked state from selectedIds
+                    if (selectedIds.has(cb.dataset.docId)) cb.checked = true;
+                    cb.addEventListener('change', () => handleRowCheckbox(cb));
+                });
+
+                // Restore select-all state
+                const allBoxes = document.querySelectorAll('.report-row-checkbox');
+                if (selectAllCb && allBoxes.length > 0) {
+                    const checkedCount = [...allBoxes].filter(b => b.checked).length;
+                    selectAllCb.checked = checkedCount === allBoxes.length;
+                    selectAllCb.indeterminate = checkedCount > 0 && checkedCount < allBoxes.length;
+                }
+
+                updateToolbarState();
+            }
         }
     }
 
@@ -153,8 +390,14 @@ function renderReportRow(report) {
     if (hazardType === 'pothole') hazardClass = 'hazard-type-pothole';
     else if (hazardType === 'crack') hazardClass = 'hazard-type-crack';
 
+    const docId = report.docId || '';
+    const adminCheckboxTd = _isAdmin
+        ? `<td class="report-cell report-cell-checkbox"><input type="checkbox" class="report-row-checkbox admin-checkbox" data-doc-id="${docId}"></td>`
+        : '';
+
     return `
-    <tr class="report-row" data-report-id="${report.id || ''}">
+    <tr class="report-row" data-report-id="${report.id || ''}" data-doc-id="${docId}">
+      ${adminCheckboxTd}
       <td class="report-cell"><span class="report-id">#${report.id || '-'}</span></td>
       <td class="report-cell"><span class="report-hazard-type ${hazardClass}">${report.hazardType || 'Unknown'}</span></td>
       <td class="report-cell report-cell-location ${hasCoords ? 'address-link' : ''}" title="${report.address || ''}" data-report-id="${report.id || ''}">

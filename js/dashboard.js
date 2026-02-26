@@ -8,7 +8,9 @@ import {
     collection,
     query,
     where,
-    onSnapshot
+    onSnapshot,
+    doc,
+    getDoc
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js';
 
@@ -18,16 +20,21 @@ import {
     setupPagination,
     setupImageModal,
     setAllReports,
-    renderFilteredReports
+    renderFilteredReports,
+    setupAdminToolbar
 } from './dashboard-reports.js';
 
 let unsubscribe = null;      // Firestore listener
+export let isAdmin = false;  // Populated after auth check
 
-export function init() {
+export async function init() {
     setupLogout();
     setupImageModal();
     setupFilters(() => renderFilteredReports());
     setupPagination();
+
+    // Detect admin role before loading map / reports
+    await detectAdminRole();
 
     initMap(() => {
         loadReports();
@@ -50,6 +57,22 @@ function setupLogout() {
     }
 }
 
+// ---------- Admin Role Detection ----------
+async function detectAdminRole() {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().type === 'admin') {
+            isAdmin = true;
+        }
+    } catch (err) {
+        console.warn('[Dashboard] Could not read user role:', err);
+    }
+    // Wire up the admin toolbar based on role
+    setupAdminToolbar(isAdmin);
+}
+
 // ---------- Firestore Real-time Listener ----------
 function loadReports() {
     const user = auth.currentUser;
@@ -57,14 +80,14 @@ function loadReports() {
 
     const username = user.displayName || user.email || 'Unknown User';
 
-    const q = query(
-        collection(db, 'reports'),
-        where('reportedBy', '==', username)
-    );
+    // Admins see ALL reports; regular users only see their own
+    const q = isAdmin
+        ? query(collection(db, 'reports'))
+        : query(collection(db, 'reports'), where('reportedBy', '==', username));
 
     unsubscribe = onSnapshot(q, (snapshot) => {
         const reports = [];
-        snapshot.forEach((doc) => reports.push({ docId: doc.id, ...doc.data() }));
+        snapshot.forEach((docSnap) => reports.push({ docId: docSnap.id, ...docSnap.data() }));
 
         // Sort by id descending
         reports.sort((a, b) => (b.id || 0) - (a.id || 0));

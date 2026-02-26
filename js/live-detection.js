@@ -217,8 +217,8 @@ class HazardTracker {
     constructor() {
         this.tracks = [];
         this.nextId = 1;
-        this.MAX_AGE = 5; // Frames to keep without seeing it
-        this.MIN_HITS = 3; // Frames seen before it's considered valid (raised to avoid premature saves)
+        this.MAX_AGE = 2;  // Frames to keep without seeing it (2 = fast cleanup while driving)
+        this.MIN_HITS = 5; // Frames seen before considered valid (~1.25s at 4FPS)
         this.IOU_THRESHOLD = 0.3; // Overlap required to match
     }
 
@@ -282,9 +282,9 @@ class HazardTracker {
         // Process mature/lost tracks
         const activeTracks = [];
         for (let track of this.tracks) {
-            // Save if it's stable and we just lost track of it slightly
-            // This ensures we have the best frame before saving.
-            if (track.hits >= this.MIN_HITS && !track.saved && track.age === 1) {
+            // Save as soon as MIN_HITS is reached (don't wait for track loss).
+            // While driving, hazards appear briefly – trigger save the moment we're confident.
+            if (track.hits >= this.MIN_HITS && !track.saved) {
                 track.saved = true;
                 autoSaveReport(track);
             }
@@ -296,7 +296,7 @@ class HazardTracker {
         }
 
         this.tracks = activeTracks;
-        return this.tracks.filter(t => t.hits >= 1 && t.age < 2);
+        return this.tracks.filter(t => t.hits >= 1 && t.age < this.MAX_AGE);
     }
 
     calculateIoU(box1, box2) {

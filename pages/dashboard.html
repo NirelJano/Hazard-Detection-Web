@@ -128,8 +128,42 @@
 
                 <!-- Reports List -->
                 <section class="dashboard-section">
-                    <h2 class="text-sm font-semibold text-dark-300 mb-2">📋 Recent Reports</h2>
-                    <div id="reports-list" class="space-y-3 overflow-y-auto pr-1">
+                    <div class="reports-section-header">
+                        <h2 class="text-sm font-semibold text-dark-300">📋 Recent Reports</h2>
+
+                        <!-- Admin Toolbar (hidden for non-admin users) -->
+                        <div id="admin-toolbar" class="admin-toolbar hidden">
+                            <span id="selected-count-badge" class="admin-selected-badge hidden"></span>
+
+                            <!-- Bulk Status -->
+                            <div class="admin-toolbar-group">
+                                <button id="bulk-status-btn" class="admin-toolbar-btn" disabled>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+                                    </svg>
+                                    Change Status
+                                </button>
+                                <select id="bulk-status-select" class="bulk-status-select hidden">
+                                    <option value="">-- Pick status --</option>
+                                    <option value="new">New</option>
+                                    <option value="in-progress">In Progress</option>
+                                    <option value="fixed">Fixed</option>
+                                </select>
+                                <button id="apply-status-btn" class="admin-toolbar-btn admin-toolbar-btn-apply hidden">Apply</button>
+                                <button id="cancel-status-btn" class="admin-toolbar-btn admin-toolbar-btn-cancel hidden">Cancel</button>
+                            </div>
+
+                            <!-- Delete Selected -->
+                            <button id="delete-selected-btn" class="admin-toolbar-btn admin-toolbar-btn-danger" disabled>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="reports-list" class="space-y-3 overflow-y-auto pr-1 mt-2">
                         <!-- Reports rendered dynamically -->
                         <div class="text-center py-8 text-dark-500 text-sm">Loading reports...</div>
                     </div>
@@ -255,5 +289,33 @@
         </button>
         <img id="modal-image" src="" alt="Full size"
             class="max-w-full max-h-[90vh] rounded-lg shadow-2xl z-40 relative" />
+    </div>
+
+    <!-- Delete Confirmation Modal (admin only) -->
+    <div id="delete-confirm-modal"
+        class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-icon">
+                <svg class="w-10 h-10 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+            </div>
+            <h3 class="confirm-modal-title">Are you sure?</h3>
+            <p class="confirm-modal-body">
+                You are about to permanently delete <strong><span id="delete-count">0</span> report(s)</strong>.
+                <br><br>This action <strong>cannot be undone</strong>.
+            </p>
+            <div class="confirm-modal-actions">
+                <button id="cancel-delete-btn" class="confirm-btn confirm-btn-cancel">Cancel</button>
+                <button id="confirm-delete-btn" class="confirm-btn confirm-btn-delete">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete permanently
+                </button>
+            </div>
+        </div>
     </div>
 </div>
