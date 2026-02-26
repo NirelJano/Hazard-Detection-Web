@@ -2,7 +2,7 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_VERSION = '11'; // Bump version to force cache update
+const CACHE_VERSION = '12'; // Bump version to force cache update
 const CACHE_NAME = 'hazard-detect-v' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   '/',
@@ -47,7 +47,9 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys
           .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+          .map((key) => caches.delete(key).catch(() => {
+            // Cache may have already been deleted — ignore
+          }))
       );
     })
   );
