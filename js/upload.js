@@ -45,6 +45,8 @@ function setupWorker() {
             case 'model-loaded':
                 console.log('[Upload] Model loaded in worker');
                 modelReady = true;
+                const overlay = document.getElementById('model-loading-overlay');
+                if (overlay) overlay.classList.add('hidden');
                 break;
 
             case 'detection-result':

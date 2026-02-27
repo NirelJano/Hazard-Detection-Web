@@ -13,6 +13,14 @@
         <h1 class="text-lg md:text-xl font-bold">Image Upload</h1>
     </header>
 
+    <!-- Loading Overlay -->
+    <div id="model-loading-overlay"
+        class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-500">
+        <div class="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 class="text-white text-lg font-bold">Loading AI Model...</h2>
+        <p class="text-dark-300 text-sm mt-2">Please wait, preparing detection engine.</p>
+    </div>
+
     <main class="main-content-shifted px-5 md:px-8 pb-12 w-full">
 
         <!-- Stacked Layout - Centered Column -->

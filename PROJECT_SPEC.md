@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-A high-performance **Mobile-First Progressive Web App (PWA)** designed to identify road hazards (potholes, cracks, etc.) using a custom Object Detection model. The system utilizes **client-side Machine Learning** for real-time detection, captures precise **geolocation data** (GPS + Reverse Geocoding), and manages a cloud-based reporting database via **Google Firebase**.
+A high-performance **Mobile-First Progressive Web App (PWA)** designed to identify road hazards (potholes, cracks, bumps, debris) using a custom Object Detection model. The system utilizes **client-side Machine Learning** for real-time detection, captures precise **geolocation data** (GPS + Reverse Geocoding), and manages a cloud-based reporting database via **Google Firebase**, with images stored in **Cloudinary**.
 
 ---
 
@@ -11,12 +11,13 @@ A high-performance **Mobile-First Progressive Web App (PWA)** designed to identi
 | Category       | Technology                                          |
 | -------------- | --------------------------------------------------- |
 | Frontend       | HTML5, Tailwind CSS, JavaScript (ES6+)              |
-| ML Engine      | TensorFlow.js (Custom Model)                        |
+| ML Engine      | TensorFlow.js (Custom YOLOv12-based Model)          |
 | Performance    | Web Workers (Inference Offloading)                  |
 | PWA Features   | Service Workers (Caching/Offline), manifest.json    |
-| Backend/DB     | Google Firebase (Auth, Firestore)                   |
-| Server         | Node.js (Static file server)                        |
-| Maps & Geo     | Google Maps JS API (Mapping & Reverse Geocoding)    |
+| Backend/DB     | Google Firebase (Auth, Firestore, Analytics)        |
+| Image Storage  | Cloudinary                                          |
+| Server & Admin | Node.js (Static file server & Cleanup scripts)      |
+| Maps & Geo     | Mapbox GL JS (Mapping), OSM Nominatim (Geocoding)   |
 | Utilities      | exif-js (Metadata extraction for gallery uploads)   |
 
 ---
@@ -27,15 +28,15 @@ A high-performance **Mobile-First Progressive Web App (PWA)** designed to identi
 
 To ensure a smooth UI at **60 FPS**, the ML model runs in a separate thread.
 
-- **Main Thread:** Handles UI, `<video>` stream, and draws Bounding Boxes (BBox) on a canvas overlay.
-- **Worker Thread:** Loads the TensorFlow.js model, receives `ImageBitmap` frames, runs detection, and returns JSON results (coordinates, labels, scores).
+- **Main Thread:** Handles UI, `<video>` stream, and draws Bounding Boxes (BBox) on a canvas overlay. Maps are managed via Mapbox GL JS.
+- **Worker Thread:** Loads the TensorFlow.js model (`worker.js`), receives `ImageBitmap` frames, runs detection, applies Non-Maximum Suppression (NMS), and returns JSON results (coordinates, labels, scores).
 
-### B. Live Detection Optimization
+### B. Live Detection Optimization & Tracking
 
-- **Inference Throttling:** Run detection every 200-300ms (approx. 3-5 FPS) to prevent device overheating.
-- **NMS (Non-Maximum Suppression):** Filter overlapping detection boxes.
-- **Auto-Save Logic:** If `confidence > 0.80`, trigger an automatic report.
-- **De-duplication:** 5-second cooldown or distance-based check to prevent multiple reports for the same hazard.
+- **Inference Throttling:** Runs detection every 250ms (~4 FPS) to prevent device overheating.
+- **Object Tracking (IoU):** Tracks detected hazards across frames using Intersection over Union (IoU) to ensure temporal stability, minimizing flickering.
+- **Auto-Save Logic:** Requires consecutive "hits" across multiple frames before automatically saving a hazard report.
+- **Cooldown & De-duplication:** 10-second cooldown per hazard type to prevent spamming the database while driving.
 
 ---
 
@@ -46,107 +47,107 @@ To ensure a smooth UI at **60 FPS**, the ML model runs in a separate thread.
 - **Sign-in Methods:** Email/Password + Google Provider.
 - **Validation Rules:**
   - Password: Minimum 8 characters, at least 1 Uppercase, 1 Lowercase.
-  - Fields: Username, Email, Password, Password Confirmation.
+- **PWA Capabilities:** Google Sign-in specifically optimized to work inside iOS PWA standalone mode.
 
 ### II. Image Upload & Static Detection
 
-- **Gallery Upload:** Uses `exif-js` to extract GPS metadata. If missing, the app blocks the report or asks for manual input.
-- **Live Capture:** Captures the browser's current Geolocation at the exact moment of the shutter press.
-- **Logic:** A "Save Report" button appears only if: `(Model Detected Hazard == True) AND (GPS Data == Present)`.
+- **Gallery/Camera Upload:** Uses `exif-js` to extract GPS metadata. If missing, attempts to use browser Geolocation API.
+- **Transactional Consistency:** Uploads images directly to Cloudinary. On Firestore save failure, an automated admin tool cleans up orphaned images.
+- **Reverse Geocoding:** Automatically translates GPS coordinates into human-readable street addresses before saving.
 
-### III. Dashboard & Visualization
+### III. Dashboard & Visualization (Split Architecture)
 
-- **Map View:** Google Map (Israel focus) with custom markers for different hazard types.
-- **Report Log:** A clean, searchable table/list including:
-  - ID, Hazard Type, Address (Text), Date, Status, Image Thumbnail.
+The dashboard logic is modularly separated for maintainability:
+- `dashboard.js`: Main orchestrator.
+- `dashboard-map.js`: Manages the Mapbox GL instance, custom HTML markers, popups, and fly-to animations.
+- `dashboard-reports.js`: Renders the report table with dynamic badging, color-coded hazard types, pagination, and image modals.
+- `dashboard-filters.js`: Handles advanced filtering by hazard type, status, date range, reporter, and search by ID/Address.
 
 ### IV. Settings & Permissions
 
 - **Permission Toggles:** Camera, Location, Gallery access status.
-- **Profile:** "Change Password" flow requiring Old Password, New Password, and Confirmation.
+- **Profile:** Theme toggling, Change Password flow.
 
 ---
 
-## 5. Database Schema (Firestore)
+## 5. Database Schema & Security (Firestore)
+
+Role-based access is strictly enforced via Firestore Security Rules.
 
 ### Collection: `reports`
-
 ```json
 {
-  "id": "UUID_AUTO_GEN",
+  "id": 12,
   "hazardType": "Pothole",
-  "date": "ServerTimestamp",
+  "date": "27/02/26 14:30",
   "coordinate": { "lat": 32.0853, "lng": 34.7818 },
   "address": "Herzl St 10, Tel Aviv",
-  "imageUrl": "Image_URL (external storage)",
-  "reportedBy": "User_UID",
-  "status": "open"
+  "imageUrl": "https://res.cloudinary.com/.../image.jpg",
+  "reportedBy": "User Name",
+  "status": "new"
 }
 ```
+- **Rules:** Authenticated users can read and create. Only admins can update or delete.
 
-> **Status Values:** `open` | `in-progress` | `fixed`
-
----
-
-## 6. Implementation Roadmap
-
-### Phase 1: Foundation
-- Initialize Firebase Project.
-- Setup PWA `manifest.json` and a basic Service Worker for offline asset caching.
-
-### Phase 2: Authentication
-- Build the login/register UI with Firebase Auth and the specified password validation.
-
-### Phase 3: Dashboard & Maps
-- Implement the Google Maps integration and the Firestore real-time listener for the report log.
-
-### Phase 4: ML Infrastructure
-- Setup the `worker.js` file.
-- Implement the bridge between the Main UI thread and the TensorFlow.js worker.
-
-### Phase 5: Detection Pages
-- Build the Static Upload page with `exif-js`.
-- Build the Live Detection page with `requestAnimationFrame` and Reverse Geocoding integration.
-
-### Phase 6: Polish
-- Add Tailwind transitions, loading states, and mobile-responsive adjustments.
-
----
-
-## 7. Project Structure
-
+### Collection: `users`
+```json
+{
+  "email": "user@example.com",
+  "type": "user", // 'admin' or 'user'
+  "createdAt": "Timestamp"
+}
 ```
+- **Rules:** Users can read and update their own profiles (cannot change their own `type`).
+
+### Collection: `metadata`
+- **Document `reportCounter`:** Used in atomic transactions to auto-increment the `id` field for new reports.
+- **Rules:** Authenticated users can read and write.
+
+---
+
+## 6. Project Structure
+
+```text
 /
-├── package.json            # Node.js project config
+├── package.json            # Node.js project config (Express desktop server)
 ├── server.js               # Node.js static dev server
-├── index.html              # Entry point / Login page
+├── firebase-config.js      # Firebase environment configuration
+├── sw.js                   # Service Worker for PWA
 ├── manifest.json           # PWA manifest
-├── sw.js                   # Service Worker
-├── firebase-config.js      # Firebase initialization
+├── index.html              # Entry point / Redirection
+│
+├── admin-tools/            # Backend/Admin scripts
+│   ├── cleanup.js          # Cloudinary orphaned images cleanup script
+│   ├── package.json        # Admin tools dependencies
+│   └── serviceAccountKey.json # Firebase Admin SDK credentials
 │
 ├── css/
-│   └── styles.css          # Tailwind + custom styles
+│   └── styles.css          # Tailwind + custom CSS (glassmorphism, animations)
 │
 ├── js/
-│   ├── app.js              # Main application router / SPA logic
-│   ├── auth.js             # Firebase Auth logic
-│   ├── dashboard.js        # Dashboard & Map logic
-│   ├── upload.js           # Static image upload + detection
-│   ├── live-detection.js   # Live camera detection page
-│   ├── settings.js         # Settings & permissions page
-│   └── worker.js           # TensorFlow.js Web Worker
+│   ├── app.js              # Global utils, Toasts, Theme management
+│   ├── auth.js             # Firebase auth state & login/register logic
+│   ├── dashboard.js        # Dashboard core orchestrator
+│   ├── dashboard-map.js    # Mapbox integration & markers
+│   ├── dashboard-reports.js# Report table rendering & pagination
+│   ├── dashboard-filters.js# Dashboard search & filtering logic
+│   ├── geocode.js          # Reverse geocoding (Nominatim API)
+│   ├── live-detection.js   # Live camera feed, tracking, auto-save
+│   ├── settings.js         # User profile and preferences
+│   ├── upload.js           # Static image upload, Cloudinary api
+│   └── worker.js           # TFJS Web Worker for YOLOv12 inference
 │
 ├── pages/
-│   ├── login.html          # Login page
-│   ├── register.html       # Registration page
-│   ├── dashboard.html      # Dashboard with map + report log
-│   ├── upload.html         # Image upload & static detection
-│   ├── live-detection.html # Live camera detection
-│   └── settings.html       # Settings & permissions
+│   ├── login.html          # Authentication view
+│   ├── register.html       # Registration view
+│   ├── dashboard.html      # Main management interface
+│   ├── upload.html         # Manual report creation
+│   ├── live-detection.html # Dashcam-style auto-reporting
+│   └── settings.html       # User configuration
 │
 ├── assets/
 │   ├── icons/              # PWA icons
-│   └── model/              # TensorFlow.js model files
+│   └── model/              # TensorFlow.js model artifacts
 │
-└── PROJECT_SPEC.md         # This file
+└── PROJECT_SPEC.md         # This specification document
 ```

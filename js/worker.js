@@ -14,7 +14,7 @@ const NMS_SCORE_THRESHOLD = 0.45;
 
 // ---------- Message Handler ----------
 self.onmessage = async (e) => {
-    const { type, image } = e.data;
+    const { type, image, speed } = e.data;
 
     switch (type) {
         case 'load-model':
@@ -26,7 +26,7 @@ self.onmessage = async (e) => {
                 self.postMessage({ type: 'error', data: 'Model not loaded' });
                 return;
             }
-            await runDetection(image);
+            await runDetection(image, speed || 0);
             break;
     }
 };
@@ -48,51 +48,273 @@ async function loadModel() {
     }
 }
 
-// ---------- Run Detection ----------
-async function runDetection(imageBitmap) {
-    try {
-        // Convert ImageBitmap to tensor
-        const tensor = tf.browser.fromPixels(imageBitmap);
-        const [height, width] = tensor.shape;
+// ---------- Tracking State Machine ----------
+const TrackState = {
+    TENTATIVE: 'tentative',
+    CONFIRMED: 'confirmed',
+    VANISHED: 'vanished',
+    REPORTED: 'reported',
+    DELETED: 'deleted'
+};
 
-        // Preprocess: resize to model input size and normalize
-        const inputSize = 640; // Adjust based on your model
-        const resized = tf.image.resizeBilinear(tensor, [inputSize, inputSize]);
-        const normalized = resized.div(255.0);
-        const batched = normalized.expandDims(0);
+class TrackManager {
+    constructor() {
+        this.tracks = [];
+        this.nextId = 1;
+        this.IOU_THRESHOLD = 0.3;
+        this.MIN_HITS = 5;       // Required frames to confirm
+        this.MAX_AGE = 15;       // Grace period before disappearing (handling occlusion)
+    }
 
-        // Run inference
-        const predictions = await model.predict(batched);
+    update(detections, currentImageBitmap, speed = 0) {
+        let requiredHits = this.MIN_HITS;
+        let confThreshold = NMS_SCORE_THRESHOLD;
 
-        // Parse results (adjust based on your model's output format)
-        const detections = await parseDetections(predictions, width, height);
-
-        // Apply Non-Maximum Suppression
-        const filtered = await applyNMS(detections);
-
-        // Send results back to main thread
-        self.postMessage({
-            type: 'detection-result',
-            data: { detections: filtered },
-        });
-
-        // Cleanup tensors
-        tensor.dispose();
-        resized.dispose();
-        normalized.dispose();
-        batched.dispose();
-        if (Array.isArray(predictions)) {
-            predictions.forEach((p) => p.dispose());
-        } else {
-            predictions.dispose();
+        // Adaptive Confidence (Step 3): > 50km/h = ~13.8 m/s
+        if (speed > 13.8) {
+            confThreshold = 0.35; // Catch blurred objects
+            requiredHits = 8;     // Require more frames to be confirmed
         }
 
-        // Close the ImageBitmap
-        imageBitmap.close();
+        // Increment age
+        this.tracks.forEach(t => {
+            if (t.state !== TrackState.REPORTED) t.age++;
+        });
+
+        const matchedDetections = new Set();
+        let keepBitmap = false;
+
+        // Match existing tracks
+        for (let track of this.tracks) {
+            if (track.state === TrackState.REPORTED) continue;
+
+            let bestIoU = 0;
+            let bestDetIdx = -1;
+
+            for (let i = 0; i < detections.length; i++) {
+                if (matchedDetections.has(i)) continue;
+                if (detections[i].label !== track.label) continue;
+                if (detections[i].score < confThreshold) continue;
+
+                const iou = this.calculateIoU(track.bbox, detections[i].bbox);
+                if (iou > bestIoU && iou > this.IOU_THRESHOLD) {
+                    bestIoU = iou;
+                    bestDetIdx = i;
+                }
+            }
+
+            if (bestDetIdx !== -1) {
+                const det = detections[bestDetIdx];
+
+                // Velocity Prediction (Step 3) - compute displacement
+                track.vx = det.bbox[0] - track.bbox[0];
+                track.vy = det.bbox[1] - track.bbox[1];
+
+                track.bbox = det.bbox;
+                track.age = 0;
+                track.hits++;
+
+                if (track.state === TrackState.TENTATIVE && track.hits >= requiredHits) {
+                    track.state = TrackState.CONFIRMED;
+                } else if (track.state === TrackState.VANISHED) {
+                    track.state = TrackState.CONFIRMED;
+                }
+
+                // Golden Frame Buffer (Step 4)
+                const area = det.bbox[2] * det.bbox[3];
+                const frameScore = det.score * area;
+                track.frameBuffer.push({ score: frameScore, bitmap: currentImageBitmap, bbox: det.bbox, scoreRaw: det.score });
+                track.frameBuffer.sort((a, b) => b.score - a.score); // Highest first
+                keepBitmap = true;
+
+                if (track.frameBuffer.length > 5) {
+                    const toDiscard = track.frameBuffer.pop();
+                    if (toDiscard && toDiscard.bitmap !== currentImageBitmap && !this.isBitmapUsed(toDiscard.bitmap, track)) {
+                        try { toDiscard.bitmap.close(); } catch (e) { }
+                    }
+                }
+
+                matchedDetections.add(bestDetIdx);
+            } else {
+                if (track.state === TrackState.CONFIRMED) {
+                    track.state = TrackState.VANISHED;
+                }
+            }
+        }
+
+        // Unmatched detections -> new tentative tracks
+        for (let i = 0; i < detections.length; i++) {
+            if (!matchedDetections.has(i)) {
+                const det = detections[i];
+                if (det.score >= confThreshold) {
+                    const area = det.bbox[2] * det.bbox[3];
+                    const frameScore = det.score * area;
+                    const newTrack = {
+                        id: this.nextId++,
+                        label: det.label,
+                        bbox: det.bbox,
+                        vx: 0,
+                        vy: 0,
+                        age: 0,
+                        hits: 1,
+                        state: TrackState.TENTATIVE,
+                        frameBuffer: [{ score: frameScore, bitmap: currentImageBitmap, bbox: det.bbox, scoreRaw: det.score }]
+                    };
+                    this.tracks.push(newTrack);
+                    keepBitmap = true;
+                }
+            }
+        }
+
+        const activeTracks = [];
+        const reportsTriggered = [];
+
+        for (let track of this.tracks) {
+            if (track.state === TrackState.REPORTED) continue;
+
+            if (track.state === TrackState.VANISHED && track.age > this.MAX_AGE) {
+                // Disappearance Trigger (Step 4): Needs to be in bottom third of frame
+                // We use bbox y + h vs image height
+                const imageHeight = currentImageBitmap.height;
+                const [x, y, w, h] = track.bbox;
+                if (y + h > imageHeight * 0.6) {
+                    track.state = TrackState.REPORTED;
+                    const bestFrame = track.frameBuffer[0];
+                    reportsTriggered.push({
+                        label: track.label,
+                        score: bestFrame.scoreRaw,
+                        bbox: bestFrame.bbox,
+                        bitmap: bestFrame.bitmap
+                    });
+                    this.closeBitmapsExcept(track, bestFrame.bitmap);
+                } else {
+                    track.state = TrackState.DELETED;
+                    this.closeBitmapsExcept(track, null);
+                }
+            } else if (track.state === TrackState.TENTATIVE && track.age > 2) {
+                track.state = TrackState.DELETED;
+                this.closeBitmapsExcept(track, null);
+            }
+
+            if (track.state !== TrackState.DELETED && track.state !== TrackState.REPORTED) {
+                // Velocity Prediction correction
+                let predictedBbox = [...track.bbox];
+                if (track.age > 0) {
+                    predictedBbox[0] += track.vx * track.age;
+                    predictedBbox[1] += track.vy * track.age;
+                }
+                activeTracks.push({
+                    id: track.id,
+                    label: track.label,
+                    bbox: predictedBbox,
+                    state: track.state,
+                    age: track.age,
+                    hits: track.hits
+                });
+            }
+        }
+
+        this.tracks = this.tracks.filter(t => t.state !== TrackState.DELETED && t.state !== TrackState.REPORTED);
+        return { activeTracks, reportsTriggered, keepBitmap };
+    }
+
+    isBitmapUsed(bitmap, skipTrack) {
+        for (let t of this.tracks) {
+            if (t === skipTrack) continue;
+            for (let f of t.frameBuffer || []) {
+                if (f.bitmap === bitmap) return true;
+            }
+        }
+        return false;
+    }
+
+    closeBitmapsExcept(track, keepBitmap) {
+        for (let f of track.frameBuffer || []) {
+            if (f.bitmap && f.bitmap !== keepBitmap && !this.isBitmapUsed(f.bitmap, track)) {
+                try { f.bitmap.close(); } catch (e) { }
+            }
+        }
+        track.frameBuffer = track.frameBuffer ? track.frameBuffer.filter(f => f.bitmap === keepBitmap) : [];
+    }
+
+    calculateIoU(box1, box2) {
+        const [x1, y1, w1, h1] = box1;
+        const [x2, y2, w2, h2] = box2;
+        const xA = Math.max(x1, x2);
+        const yA = Math.max(y1, y2);
+        const xB = Math.min(x1 + w1, x2 + w2);
+        const yB = Math.min(y1 + h1, y2 + h2);
+        const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+        const box1Area = w1 * h1;
+        const box2Area = w2 * h2;
+        const iou = interArea / parseFloat(box1Area + box2Area - interArea);
+        return iou;
+    }
+}
+
+const tracker = new TrackManager();
+
+// ---------- Run Detection ----------
+async function runDetection(imageBitmap, speed) {
+    let keepBitmap = false;
+    try {
+        let activeTracks, reportsTriggered;
+        let filtered = [];
+
+        tf.engine().startScope();
+        try {
+            // Convert ImageBitmap to tensor
+            const tensor = tf.browser.fromPixels(imageBitmap);
+            const [height, width] = tensor.shape;
+
+            // Preprocess: resize to model input size and normalize
+            const inputSize = 640; // Adjust based on your model
+            const resized = tf.image.resizeBilinear(tensor, [inputSize, inputSize]);
+            const normalized = resized.div(255.0);
+            const batched = normalized.expandDims(0);
+
+            // Run inference
+            const predictions = await model.predict(batched);
+
+            // Parse results (adjust based on your model's output format)
+            const detections = await parseDetections(predictions, width, height);
+
+            // Apply Non-Maximum Suppression
+            filtered = await applyNMS(detections);
+        } finally {
+            tf.engine().endScope();
+        }
+
+        // Send results to TrackManager
+        const result = tracker.update(filtered, imageBitmap, speed);
+        activeTracks = result.activeTracks;
+        reportsTriggered = result.reportsTriggered;
+        keepBitmap = result.keepBitmap;
+
+        // Send active tracks to UI
+        self.postMessage({
+            type: 'detection-result',
+            data: { activeTracks },
+        });
+
+        // Send triggers
+        if (reportsTriggered.length > 0) {
+            self.postMessage({
+                type: 'report-hazard',
+                data: reportsTriggered,
+            }, reportsTriggered.map(r => r.bitmap)); // transfer the ImageBitmaps
+        }
+
+        // Close the ImageBitmap if not stored in buffer
+        if (!keepBitmap) {
+            try { imageBitmap.close(); } catch (e) { }
+        }
     } catch (err) {
         console.error('[Worker] Detection error:', err);
         self.postMessage({ type: 'error', data: err.message });
-        imageBitmap.close();
+        if (!keepBitmap) {
+            try { imageBitmap.close(); } catch (e) { }
+        }
     }
 }
 

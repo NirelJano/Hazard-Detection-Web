@@ -11,7 +11,12 @@ import {
     doc,
     addDoc,
     runTransaction,
-    GeoPoint
+    GeoPoint,
+    query,
+    where,
+    orderBy,
+    limit,
+    getDocs
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
 
 let worker = null;
@@ -21,10 +26,9 @@ let isModelReady = false;
 let detectionInterval = null;
 let gpsInterval = null;       // Periodic GPS refresh interval
 let cachedGPS = null;          // GPS position cached from user-gesture context
-let pendingFrameCanvas = null; // Snapshot of the frame sent to worker (for saving correct frame)
-let tracker = null;
+let uiTracks = [];
+let animationFrameId = null;
 
-const CONFIDENCE_THRESHOLD = 0.45;
 const DETECTION_INTERVAL_MS = 250; // ~4 FPS inference
 
 // Cooldown: prevent saving the same hazard type more than once per 30 seconds
@@ -35,7 +39,6 @@ export function init() {
     setupWorker();
     setupCamera();
     setupControls();
-    tracker = new HazardTracker();
 }
 
 // ---------- Web Worker ----------
@@ -54,7 +57,12 @@ function setupWorker() {
                 updateStatus('Model loaded. Tap Start to begin.');
                 break;
             case 'detection-result':
-                handleLiveDetection(data);
+                handleLiveDetection(data.activeTracks);
+                break;
+            case 'report-hazard':
+                data.forEach(report => {
+                    autoSaveReport(report);
+                });
                 break;
             case 'error':
                 console.error('[Live] Worker error:', data);
@@ -96,7 +104,9 @@ function setupControls() {
     if (startBtn) {
         startBtn.addEventListener('click', () => {
             isDetecting = true;
+            uiTracks = [];
             startDetectionLoop();
+            startRenderLoop();
             startGPSUpdates(); // Request GPS in response to user gesture
             startBtn.classList.add('hidden');
             stopBtn?.classList.remove('hidden');
@@ -108,10 +118,13 @@ function setupControls() {
         stopBtn.addEventListener('click', () => {
             isDetecting = false;
             clearInterval(detectionInterval);
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
             stopGPSUpdates();
             stopBtn.classList.add('hidden');
             startBtn?.classList.remove('hidden');
             updateStatus('Detection paused');
+            uiTracks = [];
+            drawOverlay([]); // clear overlay
         });
     }
 }
@@ -130,15 +143,22 @@ function stopGPSUpdates() {
 
 function fetchGPS() {
     if (!('geolocation' in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            cachedGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        },
-        (err) => {
-            console.warn('[Live] GPS fetch failed:', err.message);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
-    );
+
+    // Some browsers enforce user-gesture policy strictly.
+    // If not called directly from a click, it may warn/fail.
+    try {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                cachedGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude, speed: pos.coords.speed || 0 };
+            },
+            (err) => {
+                console.warn('[Live] GPS fetch failed:', err.message);
+            },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+        );
+    } catch (e) {
+        console.warn('[Live] GPS fetch error:', e.message);
+    }
 }
 
 // ---------- Detection Loop ----------
@@ -151,15 +171,9 @@ function startDetectionLoop() {
 
         try {
             // Snapshot the current frame BEFORE transferring to worker
-            // This ensures saved images match the exact frame that was analyzed
-            const snap = document.createElement('canvas');
-            snap.width = video.videoWidth;
-            snap.height = video.videoHeight;
-            snap.getContext('2d').drawImage(video, 0, 0);
-            pendingFrameCanvas = snap;
-
             const bitmap = await createImageBitmap(video);
-            worker.postMessage({ type: 'detect', image: bitmap }, [bitmap]);
+            const speed = cachedGPS ? cachedGPS.speed || 0 : 0;
+            worker.postMessage({ type: 'detect', image: bitmap, speed }, [bitmap]);
         } catch (err) {
             // Ignore frame capture errors
         }
@@ -167,15 +181,47 @@ function startDetectionLoop() {
 }
 
 // ---------- Handle Live Detections ----------
-function handleLiveDetection(data) {
-    const { detections } = data;
-    const video = document.getElementById('camera-feed');
+function handleLiveDetection(activeTracks) {
+    const currentUiTracks = [];
+    activeTracks.forEach(track => {
+        const existing = uiTracks.find(t => t.id === track.id);
+        if (existing) {
+            existing.targetBbox = track.bbox;
+            existing.label = track.label;
+            existing.state = track.state;
+            existing.age = track.age;
+            currentUiTracks.push(existing);
+        } else {
+            currentUiTracks.push({
+                id: track.id,
+                label: track.label,
+                state: track.state,
+                age: track.age,
+                currentBbox: [...track.bbox],
+                targetBbox: [...track.bbox]
+            });
+        }
+    });
+    uiTracks = currentUiTracks;
+}
 
-    // Pass the snapshot of the analyzed frame (not the live video)
-    const activeTracks = tracker.update(detections, pendingFrameCanvas || video);
+// ---------- Render Loop (60 FPS) ----------
+function startRenderLoop() {
+    function render() {
+        if (!isDetecting) return;
 
-    // Draw tracking boxes
-    drawOverlay(activeTracks);
+        // Fast UI Tracking (EMA with alpha = 0.2)
+        const ALPHA = 0.2;
+        uiTracks.forEach(track => {
+            for (let i = 0; i < 4; i++) {
+                track.currentBbox[i] += (track.targetBbox[i] - track.currentBbox[i]) * ALPHA;
+            }
+        });
+
+        drawOverlay(uiTracks);
+        animationFrameId = requestAnimationFrame(render);
+    }
+    render();
 }
 
 // ---------- Draw Overlay ----------
@@ -192,182 +238,66 @@ function drawOverlay(tracks) {
     if (!tracks || tracks.length === 0) return;
 
     tracks.forEach((track) => {
-        const [x, y, w, h] = track.bbox;
+        const [x, y, w, h] = track.currentBbox;
+
+        // Color based on state
+        let color = '#facc15'; // tentative: yellow
+        if (track.state === 'confirmed') color = '#22c55e'; // confirmed: green
+        if (track.state === 'vanished') color = '#ef4444'; // vanished: red
 
         // Box
-        ctx.strokeStyle = '#22c55e';
+        ctx.strokeStyle = color;
         ctx.lineWidth = 3;
         ctx.strokeRect(x, y, w, h);
 
         // Label background
-        ctx.fillStyle = '#22c55e';
-        const label = `${track.label} (ID: ${track.id})`;
+        ctx.fillStyle = color;
+        const labelText = track.state === 'confirmed' ? track.label : `${track.label} (?)`;
         ctx.font = 'bold 14px Inter';
-        const tw = ctx.measureText(label).width;
+        const tw = ctx.measureText(labelText).width;
         ctx.fillRect(x, y - 22, tw + 8, 22);
 
         // Label text
         ctx.fillStyle = '#fff';
-        ctx.fillText(label, x + 4, y - 6);
+        ctx.fillText(labelText, x + 4, y - 6);
     });
 }
 
-// ---------- Object Tracking (IoU) ----------
-class HazardTracker {
-    constructor() {
-        this.tracks = [];
-        this.nextId = 1;
-        this.MAX_AGE = 2;  // Frames to keep without seeing it (2 = fast cleanup while driving)
-        this.MIN_HITS = 5; // Frames seen before considered valid (~1.25s at 4FPS)
-        this.IOU_THRESHOLD = 0.3; // Overlap required to match
-    }
+function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Radius of the earth in m
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
 
-    update(detections, videoElement) {
-        // Increment age of all tracks
-        this.tracks.forEach(t => t.age++);
-
-        // Match detections to existing tracks
-        const matchedDetections = new Set();
-
-        for (let track of this.tracks) {
-            let bestIoU = 0;
-            let bestDetIdx = -1;
-
-            for (let i = 0; i < detections.length; i++) {
-                if (matchedDetections.has(i)) continue;
-                if (detections[i].label !== track.label) continue;
-
-                const iou = this.calculateIoU(track.bbox, detections[i].bbox);
-                if (iou > bestIoU && iou > this.IOU_THRESHOLD) {
-                    bestIoU = iou;
-                    bestDetIdx = i;
-                }
-            }
-
-            if (bestDetIdx !== -1) {
-                const det = detections[bestDetIdx];
-                track.bbox = det.bbox;
-                track.age = 0; // Reset age since we saw it
-                track.hits++;
-
-                // Keep the clearest frame
-                if (det.score > track.bestScore) {
-                    track.bestScore = det.score;
-                    track.bestFrameCanvas = this.captureFrameCanvas(videoElement, track);
-                }
-                matchedDetections.add(bestDetIdx);
-            }
-        }
-
-        // Create new tracks 
-        for (let i = 0; i < detections.length; i++) {
-            if (!matchedDetections.has(i)) {
-                const det = detections[i];
-                if (det.score >= CONFIDENCE_THRESHOLD) {
-                    const newTrack = {
-                        id: this.nextId++,
-                        label: det.label,
-                        bbox: det.bbox,
-                        age: 0,
-                        hits: 1,
-                        bestScore: det.score,
-                        saved: false
-                    };
-                    newTrack.bestFrameCanvas = this.captureFrameCanvas(videoElement, newTrack);
-                    this.tracks.push(newTrack);
-                }
-            }
-        }
-
-        // Process mature/lost tracks
-        const activeTracks = [];
-        for (let track of this.tracks) {
-            // Save as soon as MIN_HITS is reached (don't wait for track loss).
-            // While driving, hazards appear briefly – trigger save the moment we're confident.
-            if (track.hits >= this.MIN_HITS && !track.saved) {
-                track.saved = true;
-                autoSaveReport(track);
-            }
-
-            // Keep if not too old
-            if (track.age < this.MAX_AGE) {
-                activeTracks.push(track);
-            }
-        }
-
-        this.tracks = activeTracks;
-        return this.tracks.filter(t => t.hits >= 1 && t.age < this.MAX_AGE);
-    }
-
-    calculateIoU(box1, box2) {
-        const [x1, y1, w1, h1] = box1;
-        const [x2, y2, w2, h2] = box2;
-
-        const xA = Math.max(x1, x2);
-        const yA = Math.max(y1, y2);
-        const xB = Math.min(x1 + w1, x2 + w2);
-        const yB = Math.min(y1 + h1, y2 + h2);
-
-        const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
-        const box1Area = w1 * h1;
-        const box2Area = w2 * h2;
-        const iou = interArea / parseFloat(box1Area + box2Area - interArea);
-
-        return iou;
-    }
-
-    captureFrameCanvas(frameSource, trackInfo) {
-        try {
-            const canvas = document.createElement('canvas');
-            // frameSource can be a canvas snapshot or a video element
-            const w = frameSource.videoWidth ?? frameSource.width;
-            const h = frameSource.videoHeight ?? frameSource.height;
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(frameSource, 0, 0, w, h);
-
-            if (trackInfo) {
-                const [x, y, bw, bh] = trackInfo.bbox;
-
-                // Draw Box
-                ctx.strokeStyle = '#22c55e';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(x, y, bw, bh);
-
-                // Draw Label Background
-                ctx.fillStyle = '#22c55e';
-                const label = `${trackInfo.label} ${(trackInfo.bestScore * 100).toFixed(0)}%`;
-                ctx.font = 'bold 14px Inter';
-                const tw = ctx.measureText(label).width;
-                ctx.fillRect(x, y - 22, tw + 8, 22);
-
-                // Draw Label Text
-                ctx.fillStyle = '#fff';
-                ctx.fillText(label, x + 4, y - 6);
-            }
-
-            return canvas;
-        } catch (e) {
-            return null;
-        }
-    }
+function deg2rad(deg) {
+    return deg * (Math.PI / 180);
 }
 
 // ---------- Auto-Save Report ----------
-async function autoSaveReport(track) {
+async function autoSaveReport(report) {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+        // close unused bitmap
+        try { report.bitmap.close(); } catch (e) { }
+        return;
+    }
 
     // Cooldown guard: skip if we saved this hazard type recently
     const now = Date.now();
-    const lastSaved = recentlySaved.get(track.label);
+    const lastSaved = recentlySaved.get(report.label);
     if (lastSaved && (now - lastSaved) < SAVE_COOLDOWN_MS) {
-        console.log(`[Live] Skipping auto-save for ${track.label} – cooldown active (${Math.round((SAVE_COOLDOWN_MS - (now - lastSaved)) / 1000)}s remaining)`);
+        console.log(`[Live] Skipping auto-save for ${report.label} – local cooldown active (${Math.round((SAVE_COOLDOWN_MS - (now - lastSaved)) / 1000)}s remaining)`);
+        try { report.bitmap.close(); } catch (e) { }
         return;
     }
-    // Mark this label as saved immediately to block concurrent calls
-    recentlySaved.set(track.label, now);
+    // Mark this label as saved locally
+    recentlySaved.set(report.label, now);
 
     // Use the cached GPS position (set when user clicked Start)
     if (!cachedGPS) {
@@ -377,12 +307,40 @@ async function autoSaveReport(track) {
     const gps = cachedGPS;
 
     try {
+        // Spatial Deduplication (Check Firestore for recent duplicates within 5m)
+        // Removed orderBy and limit to avoid requiring a composite index. We handle sorting locally.
+        const q = query(collection(db, 'reports'), where('hazardType', '==', report.label));
+        const recentSnap = await getDocs(q);
+
+        const recentDocs = [];
+        recentSnap.forEach(snap => recentDocs.push(snap.data()));
+        recentDocs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const topRecent = recentDocs.slice(0, 10);
+
+        let shouldSkip = false;
+        topRecent.forEach(data => {
+            if (data.coordinate && data.createdAt) {
+                const ageMs = Date.now() - data.createdAt;
+                if (ageMs < 30_000) { // 30 seconds wait window
+                    const dist = getDistanceFromLatLonInM(gps.lat, gps.lng, data.coordinate.latitude, data.coordinate.longitude);
+                    if (dist < 5) shouldSkip = true;
+                }
+            }
+        });
+
+        if (shouldSkip) {
+            console.log(`[Live] Duplicate detected in DB within 5m and 30s. Skipping.`);
+            try { report.bitmap.close(); } catch (e) { }
+            return;
+        }
+
         // Reverse-geocode coordinates → address (required)
         let address;
         try {
             address = await reverseGeocode(gps.lat, gps.lng);
         } catch (geoErr) {
             console.warn('[Live] Reverse geocoding failed, skipping auto-save:', geoErr);
+            try { report.bitmap.close(); } catch (e) { }
             return;
         }
 
@@ -397,14 +355,38 @@ async function autoSaveReport(track) {
 
         // Upload image if we have it
         let imageUrl = '';
-        if (track.bestFrameCanvas) {
+        if (report.bitmap) {
             try {
-                const blob = await new Promise(resolve => track.bestFrameCanvas.toBlob(resolve, 'image/jpeg', 0.8));
+                // Convert ImageBitmap to canvas to draw bounding box
+                const canvas = document.createElement('canvas');
+                canvas.width = report.bitmap.width;
+                canvas.height = report.bitmap.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(report.bitmap, 0, 0);
+
+                // Draw bbox
+                const [x, y, bw, bh] = report.bbox;
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, y, bw, bh);
+
+                ctx.fillStyle = '#22c55e';
+                const scoreText = `${report.label} ${(report.score * 100).toFixed(0)}%`;
+                ctx.font = 'bold 24px Inter';
+                const tw = ctx.measureText(scoreText).width;
+                ctx.fillRect(x, y - 32, tw + 16, 32);
+                ctx.fillStyle = '#fff';
+                ctx.fillText(scoreText, x + 8, y - 8);
+
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
                 if (blob) {
                     imageUrl = await uploadToCloudinary(blob, `hazard_live_${Date.now()}.jpg`);
                 }
             } catch (blurErr) {
                 console.warn('[Live] Image upload failed', blurErr);
+            } finally {
+                // Close the bitmap to free memory
+                try { report.bitmap.close(); } catch (e) { }
             }
         }
 
@@ -422,8 +404,9 @@ async function autoSaveReport(track) {
         // Save report as a new document (Firestore auto-generates the doc ID)
         await addDoc(collection(db, 'reports'), {
             id: nextId,
-            hazardType: track.label,
+            hazardType: report.label,
             date: formattedDate,
+            createdAt: Date.now(), // timestamp for deduplication
             coordinate: new GeoPoint(gps.lat, gps.lng),
             address: address,
             imageUrl: imageUrl,
@@ -431,11 +414,10 @@ async function autoSaveReport(track) {
             status: 'new',
         });
 
-        showToast(`Auto-saved: ${track.label}`, 'success');
+        showToast(`Auto-saved: ${report.label}`, 'success');
     } catch (err) {
         console.error('[Live] Auto-save error:', err);
-        // On failure, remove the cooldown so the user can retry
-        recentlySaved.delete(track.label);
+        recentlySaved.delete(report.label);
     }
 }
 
@@ -452,5 +434,6 @@ window.addEventListener('beforeunload', () => {
     }
     if (worker) worker.terminate();
     clearInterval(detectionInterval);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
     clearInterval(gpsInterval);
 });
