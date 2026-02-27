@@ -164,9 +164,9 @@ async function handleFile(file, isCamera = false) {
             // We could naturally wait for the model-loaded event, but for now simple check
         }
 
-        // Send to worker for detection
+        // Send to worker for static detection
         const bitmap = await createImageBitmap(img);
-        worker.postMessage({ type: 'detect', image: bitmap }, [bitmap]);
+        worker.postMessage({ type: 'detect-static', image: bitmap }, [bitmap]);
     };
 
     img.src = URL.createObjectURL(file);

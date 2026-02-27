@@ -24,9 +24,19 @@ self.onmessage = async (e) => {
         case 'detect':
             if (!model) {
                 self.postMessage({ type: 'error', data: 'Model not loaded' });
+                try { image.close(); } catch (err) { }
                 return;
             }
             await runDetection(image, speed || 0);
+            break;
+
+        case 'detect-static':
+            if (!model) {
+                self.postMessage({ type: 'error', data: 'Model not loaded' });
+                try { image.close(); } catch (err) { }
+                return;
+            }
+            await runStaticDetection(image);
             break;
     }
 };
@@ -62,7 +72,7 @@ class TrackManager {
         this.tracks = [];
         this.nextId = 1;
         this.IOU_THRESHOLD = 0.3;
-        this.MIN_HITS = 5;       // Required frames to confirm
+        this.MIN_HITS = 2;       // Required frames to confirm (reduced for snappier response)
         this.MAX_AGE = 15;       // Grace period before disappearing (handling occlusion)
     }
 
@@ -72,8 +82,8 @@ class TrackManager {
 
         // Adaptive Confidence (Step 3): > 50km/h = ~13.8 m/s
         if (speed > 13.8) {
-            confThreshold = 0.35; // Catch blurred objects
-            requiredHits = 8;     // Require more frames to be confirmed
+            confThreshold = 0.35; // Catch blurred objects, but bounded slightly higher than before (was 0.35)
+            requiredHits = 2;     // Require LESS frames to be confirmed since objects pass quickly
         }
 
         // Increment age
@@ -304,7 +314,6 @@ async function runDetection(imageBitmap, speed) {
                 data: reportsTriggered,
             }, reportsTriggered.map(r => r.bitmap)); // transfer the ImageBitmaps
         }
-
         // Close the ImageBitmap if not stored in buffer
         if (!keepBitmap) {
             try { imageBitmap.close(); } catch (e) { }
@@ -315,6 +324,44 @@ async function runDetection(imageBitmap, speed) {
         if (!keepBitmap) {
             try { imageBitmap.close(); } catch (e) { }
         }
+    }
+}
+
+// ---------- Run Static Detection (Single Image) ----------
+async function runStaticDetection(imageBitmap) {
+    try {
+        let filtered = [];
+
+        tf.engine().startScope();
+        try {
+            const tensor = tf.browser.fromPixels(imageBitmap);
+            const [height, width] = tensor.shape;
+
+            const inputSize = 640;
+            const resized = tf.image.resizeBilinear(tensor, [inputSize, inputSize]);
+            const normalized = resized.div(255.0);
+            const batched = normalized.expandDims(0);
+
+            const predictions = await model.predict(batched);
+            const detections = await parseDetections(predictions, width, height);
+
+            filtered = await applyNMS(detections);
+        } finally {
+            tf.engine().endScope();
+        }
+
+        // For static detection, we just return the raw NMS filtered boxes without tracking
+        self.postMessage({
+            type: 'detection-result',
+            data: { detections: filtered },
+        });
+
+        try { imageBitmap.close(); } catch (e) { }
+
+    } catch (err) {
+        console.error('[Worker] Static detection error:', err);
+        self.postMessage({ type: 'error', data: err.message });
+        try { imageBitmap.close(); } catch (e) { }
     }
 }
 
