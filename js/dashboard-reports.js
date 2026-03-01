@@ -22,10 +22,17 @@ let pageSize = 25;
 // ---------- Admin State ----------
 let _isAdmin = false;
 let selectedIds = new Set();   // Set of report docIds currently checked
+let _showAllMarkers = false;   // Admin toggle: show all markers on map
 
 // Helper: resolve image URL for display (handles 'uploading' placeholder)
-export function getDisplayImageUrl(imageUrl) {
+// Optionally applies Cloudinary thumbnail transforms for bandwidth savings
+export function getDisplayImageUrl(imageUrl, { thumbnail = true } = {}) {
     if (!imageUrl || imageUrl === 'uploading') return 'assets/icons/icon-192.png';
+    // Apply Cloudinary blurry thumbnail transforms if URL is from Cloudinary
+    // Serves a tiny blurred placeholder (~2-3KB) instead of full image (2-5MB)
+    if (thumbnail && imageUrl.includes('res.cloudinary.com') && imageUrl.includes('/upload/')) {
+        return imageUrl.replace('/upload/', '/upload/w_40,h_40,c_fill,f_auto,q_30,e_blur:600/');
+    }
     return imageUrl;
 }
 
@@ -349,10 +356,10 @@ export function renderFilteredReports(resetPage = true) {
                     </table>
                 </div>`;
 
-            // Add click listeners for images
+            // Add click listeners for images (open full-size, not thumbnail)
             document.querySelectorAll('.report-img-clickable').forEach(img => {
                 img.addEventListener('click', (e) => {
-                    openImageModal(e.target.src);
+                    openImageModal(e.target.dataset.fullSrc || e.target.src);
                 });
             });
 
@@ -394,11 +401,14 @@ export function renderFilteredReports(resetPage = true) {
     // Update pagination controls
     updatePaginationControls(filtered.length, totalPages, startIdx, endIdx);
 
-    // Update map markers with filtered reports
-    updateMapMarkers(filtered);
+    // Update map markers: show page reports only, unless admin toggled "show all"
+    updateMapMarkers(_showAllMarkers ? filtered : pageReports);
 
     // Update mobile badge
     updateFilterBadge();
+
+    // Update show-all-markers button state
+    updateShowAllMarkersButton(filtered.length, pageReports.length);
 }
 
 function renderReportRow(report) {
@@ -451,6 +461,7 @@ function renderReportRow(report) {
       <td class="report-cell report-cell-img">
         <img
           src="${getDisplayImageUrl(report.imageUrl)}"
+          data-full-src="${getDisplayImageUrl(report.imageUrl, { thumbnail: false })}"
           alt="Hazard"
           class="report-img report-img-clickable"
           loading="lazy"
@@ -595,5 +606,31 @@ function scrollReportsToTop() {
     const reportsList = document.getElementById('reports-list');
     if (reportsList) {
         reportsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// ---------- Show All Markers (Admin Only) ----------
+export function toggleShowAllMarkers() {
+    _showAllMarkers = !_showAllMarkers;
+    renderFilteredReports(false); // Re-render to update map markers
+}
+
+function updateShowAllMarkersButton(totalFiltered, pageCount) {
+    const btn = document.getElementById('show-all-markers-btn');
+    if (!btn) return;
+
+    // Only show for admin and only if there are more reports than current page shows
+    if (!_isAdmin || totalFiltered <= pageCount) {
+        btn.classList.add('hidden');
+        return;
+    }
+
+    btn.classList.remove('hidden');
+    if (_showAllMarkers) {
+        btn.classList.add('active');
+        btn.innerHTML = `🗺️ Showing All (${totalFiltered})`;
+    } else {
+        btn.classList.remove('active');
+        btn.innerHTML = `🗺️ Show All Markers (${totalFiltered})`;
     }
 }

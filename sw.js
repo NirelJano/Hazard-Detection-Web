@@ -2,7 +2,7 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_VERSION = '15'; // Bumping to apply trial tracking thresholds
+const CACHE_VERSION = '17'; // Performance overhaul: Cloudinary thumbs, lazy Mapbox, paginated Firestore
 const CACHE_NAME = 'hazard-detect-v' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   '/',
@@ -20,6 +20,9 @@ const ASSETS_TO_CACHE = [
   '/js/app.js',
   '/js/auth.js',
   '/js/dashboard.js',
+  '/js/dashboard-map.js',
+  '/js/dashboard-reports.js',
+  '/js/dashboard-filters.js',
   '/js/upload.js',
   '/js/worker.js',
   '/js/live-detection.js',

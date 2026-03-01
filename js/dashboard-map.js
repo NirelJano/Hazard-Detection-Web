@@ -8,7 +8,45 @@ let map = null;              // Mapbox GL map instance
 let markers = [];            // Active marker references
 let popups = [];             // Active popup references
 
-export function initMap(onReady) {
+// ---------- Dynamic Mapbox SDK Loader ----------
+const MAPBOX_VERSION = '2.15.0';
+let mapboxLoaded = false;
+let mapboxLoadPromise = null;
+
+function loadMapboxSDK() {
+    if (mapboxLoaded) return Promise.resolve();
+    if (mapboxLoadPromise) return mapboxLoadPromise;
+
+    mapboxLoadPromise = new Promise((resolve, reject) => {
+        // Load CSS
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_VERSION}/mapbox-gl.css`;
+        document.head.appendChild(link);
+
+        // Load JS
+        const script = document.createElement('script');
+        script.src = `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_VERSION}/mapbox-gl.js`;
+        script.onload = () => {
+            mapboxLoaded = true;
+            resolve();
+        };
+        script.onerror = () => reject(new Error('Failed to load Mapbox GL JS'));
+        document.head.appendChild(script);
+    });
+
+    return mapboxLoadPromise;
+}
+
+export async function initMap(onReady) {
+    try {
+        await loadMapboxSDK();
+    } catch (err) {
+        console.error('[Dashboard] Failed to load Mapbox SDK:', err);
+        if (onReady) onReady();
+        return;
+    }
+
     if (typeof mapboxgl === 'undefined') {
         console.error('[Dashboard] Mapbox GL JS was expected to be loaded but is not.');
         if (onReady) onReady();
@@ -36,6 +74,7 @@ export function initMap(onReady) {
         if (onReady) onReady();
     }
 }
+
 
 // ---------- Map Markers ----------
 export function updateMapMarkers(reports) {
@@ -72,7 +111,7 @@ export function updateMapMarkers(reports) {
                     src="${getDisplayImageUrl(report.imageUrl)}"
                     alt="Hazard"
                     class="marker-popup-img"
-                    data-full-src="${getDisplayImageUrl(report.imageUrl)}"
+                    data-full-src="${getDisplayImageUrl(report.imageUrl, { thumbnail: false })}"
                 />
                 <div class="marker-popup-details">
                     <p class="marker-popup-address">📍 ${report.address || 'No address'}</p>
@@ -94,14 +133,17 @@ export function updateMapMarkers(reports) {
         // After popup opens, attach event listeners
         popup.on('open', () => {
             setTimeout(() => {
-                const img = document.querySelector('.marker-popup-img');
+                const popupEl = popup.getElement();
+                if (!popupEl) return;
+
+                const img = popupEl.querySelector('.marker-popup-img');
                 if (img) {
                     img.addEventListener('click', () => {
                         openImageModal(img.dataset.fullSrc);
                     });
                 }
 
-                const gotoBtn = document.querySelector('.marker-popup-goto');
+                const gotoBtn = popupEl.querySelector('.marker-popup-goto');
                 if (gotoBtn) {
                     gotoBtn.addEventListener('click', () => {
                         const reportId = gotoBtn.dataset.reportId;

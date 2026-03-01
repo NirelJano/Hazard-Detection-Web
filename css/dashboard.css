@@ -490,6 +490,14 @@ select.filter-input {
     background: rgba(59, 130, 246, 0.3);
 }
 
+/* ========== Show All Markers Button (Admin) ========== */
+#show-all-markers-btn.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
+}
+
 /* ========== Pagination Controls ========== */
 .pagination-controls {
     display: flex;
@@ -759,8 +767,15 @@ select.filter-input {
 }
 
 @keyframes modalSlideIn {
-    from { transform: translateY(-20px); opacity: 0; }
-    to   { transform: translateY(0);     opacity: 1; }
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .confirm-modal-icon {
