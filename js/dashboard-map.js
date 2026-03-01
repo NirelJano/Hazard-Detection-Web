@@ -66,6 +66,9 @@ export async function initMap(onReady) {
         map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
         map.on('load', () => {
+            // Hide the loading spinner
+            const spinner = document.getElementById('map-loading-spinner');
+            if (spinner) spinner.style.display = 'none';
             if (onReady) onReady();
         });
 

@@ -32,9 +32,18 @@ export async function init() {
     // Detect admin role before loading map / reports
     await detectAdminRole();
 
-    initMap(() => {
-        loadReports();
-    });
+    // Defer map loading to reduce TBT — let the DOM finish rendering first
+    const deferredMapInit = () => {
+        initMap(() => {
+            loadReports();
+        });
+    };
+
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(deferredMapInit, { timeout: 2000 });
+    } else {
+        setTimeout(deferredMapInit, 100);
+    }
 
     // Wire up admin "Show All Markers" button
     const showAllBtn = document.getElementById('show-all-markers-btn');
@@ -83,10 +92,8 @@ async function loadReports() {
     const username = user.displayName || user.email || 'Unknown User';
 
     try {
-        // Build query: admins see ALL reports; regular users only their own
-        const q = isAdmin
-            ? query(collection(db, 'reports'))
-            : query(collection(db, 'reports'), where('reportedBy', '==', username));
+        // Build query: all authenticated users can see ALL reports
+        const q = query(collection(db, 'reports'));
 
         const snapshot = await getDocs(q);
 

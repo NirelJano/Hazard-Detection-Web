@@ -33,6 +33,28 @@ export function init() {
     });
 }
 
+// ---------- EXIF.js Dynamic Loader ----------
+let exifLoaded = false;
+let exifLoadPromise = null;
+
+function loadEXIF() {
+    if (exifLoaded) return Promise.resolve();
+    if (exifLoadPromise) return exifLoadPromise;
+
+    exifLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js';
+        script.onload = () => {
+            exifLoaded = true;
+            resolve();
+        };
+        script.onerror = () => reject(new Error('Failed to load EXIF.js'));
+        document.head.appendChild(script);
+    });
+
+    return exifLoadPromise;
+}
+
 // ---------- Web Worker ----------
 function setupWorker() {
     if (worker) worker.terminate();
@@ -61,7 +83,13 @@ function setupWorker() {
         }
     };
 
-    worker.postMessage({ type: 'load-model' });
+    // Defer model loading until after First Paint for better LCP
+    const startModelLoad = () => worker.postMessage({ type: 'load-model' });
+    if ('requestIdleCallback' in self) {
+        requestIdleCallback(startModelLoad);
+    } else {
+        setTimeout(startModelLoad, 100);
+    }
 }
 
 // ---------- File Upload ----------
@@ -174,6 +202,13 @@ async function handleFile(file, isCamera = false) {
 
 // ---------- GPS Extraction (exif-js) ----------
 async function extractGPS(file, isCamera) {
+    // Load EXIF.js dynamically on first use (before entering Promise constructor)
+    try {
+        await loadEXIF();
+    } catch (err) {
+        console.warn('[Upload] Could not load EXIF.js, will use device location if camera');
+    }
+
     return new Promise((resolve) => {
 
         const fallbackToDeviceLocation = () => {

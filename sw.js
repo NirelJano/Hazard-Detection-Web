@@ -2,7 +2,7 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_VERSION = '17'; // Performance overhaul: Cloudinary thumbs, lazy Mapbox, paginated Firestore
+const CACHE_VERSION = '18'; // Lighthouse optimization: CLS, LCP, TBT, a11y, model caching
 const CACHE_NAME = 'hazard-detect-v' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   '/',
@@ -28,7 +28,10 @@ const ASSETS_TO_CACHE = [
   '/js/live-detection.js',
   '/js/settings.js',
   '/js/geocode.js',
-  '/manifest.json'
+  '/manifest.json',
+  '/robots.txt',
+  '/assets/model/model.json',
+  '/assets/model/group1-shard1of1.bin'
 ];
 
 
@@ -73,8 +76,7 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('api.mapbox.com') ||
     url.pathname.startsWith('/__/auth') ||
     url.hostname.includes('firebaseapp.com') ||
-    url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.pathname.includes('/assets/model/')
+    url.hostname.includes('identitytoolkit.googleapis.com')
   ) {
     return;
   }

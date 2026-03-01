@@ -214,9 +214,11 @@ async function handleGoogleResult(result) {
         const userSnap = await getDoc(userRef);
 
         if (userSnap.exists()) {
+            const data = userSnap.data();
             // User already exists — update ONLY display fields, never touch 'type' (preserves admin role)
+            // Preserve the existing username if it exists (e.g. from email registration)
             await setDoc(userRef, {
-                username: result.user.displayName || 'Google User',
+                username: data.username || result.user.displayName || 'Google User',
                 email: result.user.email,
             }, { merge: true });
         } else {

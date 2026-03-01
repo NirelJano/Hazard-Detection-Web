@@ -70,7 +70,13 @@ function setupWorker() {
         }
     };
 
-    worker.postMessage({ type: 'load-model' });
+    // Defer model loading until after First Paint for better LCP
+    const startModelLoad = () => worker.postMessage({ type: 'load-model' });
+    if ('requestIdleCallback' in self) {
+        requestIdleCallback(startModelLoad);
+    } else {
+        setTimeout(startModelLoad, 100);
+    }
 }
 
 // ---------- Camera Setup ----------
