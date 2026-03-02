@@ -62,6 +62,22 @@ export function setupFilters(onFilterChange) {
     if (clearBtn) {
         clearBtn.addEventListener('click', clearFilters);
     }
+
+    // Date constraints
+    const dateFromEl = document.getElementById('filter-date-from');
+    const dateToEl = document.getElementById('filter-date-to');
+
+    // Set 'today' in local time
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const today = new Date(now.getTime() - tzOffset).toISOString().split('T')[0];
+
+    if (dateFromEl) {
+        dateFromEl.max = today;
+    }
+    if (dateToEl) {
+        dateToEl.min = today;
+    }
 }
 
 function readFilterValues() {

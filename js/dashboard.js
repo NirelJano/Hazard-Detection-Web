@@ -14,6 +14,7 @@ import { initMap } from './dashboard-map.js';
 import { setupFilters, populateFilterOptions } from './dashboard-filters.js';
 import {
     setupPagination,
+    setupSorting,
     setupImageModal,
     setAllReports,
     renderFilteredReports,
@@ -28,6 +29,7 @@ export async function init() {
     setupImageModal();
     setupFilters(() => renderFilteredReports());
     setupPagination();
+    setupSorting();
 
     // Detect admin role before loading map / reports
     await detectAdminRole();

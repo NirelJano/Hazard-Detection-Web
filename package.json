@@ -6,7 +6,8 @@
     "scripts": {
         "start": "node server.js",
         "dev": "node server.js",
-        "build": "echo 'Build skip'"
+        "build": "echo 'Build skip'",
+        "deploy": "echo '\\n🚀 Deploying commit:' && git log -1 --format='   %h - %s (%cr)' && echo '' && firebase deploy --only hosting"
     },
     "keywords": [
         "hazard",

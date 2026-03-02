@@ -19,6 +19,10 @@ export let currentReports = [];     // Currently displayed (filtered) reports
 let currentPage = 1;
 let pageSize = 25;
 
+// ---------- Sorting State ----------
+export let currentSortColumn = 'id';
+export let currentSortDirection = 'desc'; // 'asc' or 'desc'
+
 // ---------- Admin State ----------
 let _isAdmin = false;
 let selectedIds = new Set();   // Set of report docIds currently checked
@@ -271,9 +275,40 @@ function handleRowCheckbox(cb) {
     updateToolbarState();
 }
 
+// ---------- Sorting Logic ----------
+function sortReportsArray(reports, column, direction) {
+    reports.sort((a, b) => {
+        let valA = a[column];
+        let valB = b[column];
+
+        if (column === 'id') {
+            valA = Number(valA) || 0;
+            valB = Number(valB) || 0;
+        } else if (column === 'date') {
+            valA = valA?.toDate ? valA.toDate().getTime() : new Date(valA).getTime();
+            valB = valB?.toDate ? valB.toDate().getTime() : new Date(valB).getTime();
+        } else {
+            if (column === 'location') {
+                valA = a.address || '';
+                valB = b.address || '';
+            }
+            valA = String(valA || '').toLowerCase();
+            valB = String(valB || '').toLowerCase();
+        }
+
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
 // ---------- Render ----------
 export function renderFilteredReports(resetPage = true) {
     const filtered = applyFilters(allReports);
+
+    // Sort before paginating
+    sortReportsArray(filtered, currentSortColumn, currentSortDirection);
+
     currentReports = filtered;
 
     // Reset to page 1 when filters change
@@ -325,6 +360,13 @@ export function renderFilteredReports(resetPage = true) {
                 ? `<th class="report-cell-checkbox"><input type="checkbox" id="select-all-checkbox" class="admin-checkbox" title="Select all"></th>`
                 : '';
 
+            const th = (colId, label) => {
+                const isActive = currentSortColumn === colId;
+                const icon = isActive ? (currentSortDirection === 'asc' ? '↑' : '↓') : '↕';
+                const activeClass = isActive ? 'sort-active' : '';
+                return `<th class="sortable-header ${activeClass}" data-sort="${colId}">${label} <span class="sort-icon">${icon}</span></th>`;
+            };
+
             reportsList.innerHTML = `
                 <div class="w-full overflow-x-auto">
                     <table class="reports-table">
@@ -341,13 +383,13 @@ export function renderFilteredReports(resetPage = true) {
                         <thead>
                             <tr class="reports-table-header">
                                 ${adminTh}
-                                <th>ID</th>
-                                <th>Hazard Type</th>
-                                <th>Location</th>
-                                <th>Date</th>
+                                ${th('id', 'ID')}
+                                ${th('hazardType', 'Hazard Type')}
+                                ${th('location', 'Location')}
+                                ${th('date', 'Date')}
                                 <th class="text-center">Image</th>
-                                <th>Status</th>
-                                <th>Reported By</th>
+                                ${th('status', 'Status')}
+                                ${th('reportedBy', 'Reported By')}
                             </tr>
                         </thead>
                         <tbody>
@@ -409,6 +451,16 @@ export function renderFilteredReports(resetPage = true) {
 
     // Update show-all-markers button state
     updateShowAllMarkersButton(filtered.length, pageReports.length);
+
+    // Update reset sort button visibility
+    const resetBtn = document.getElementById('reset-sort-btn');
+    if (resetBtn) {
+        if (currentSortColumn !== 'id' || currentSortDirection !== 'desc') {
+            resetBtn.classList.remove('hidden');
+        } else {
+            resetBtn.classList.add('hidden');
+        }
+    }
 }
 
 function renderReportRow(report) {
@@ -528,6 +580,37 @@ export function setupImageModal() {
         closeBtn.addEventListener('click', closeModal);
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
+        });
+    }
+}
+
+// ============================================
+// SORTING
+// ============================================
+
+export function setupSorting() {
+    const reportsList = document.getElementById('reports-list');
+    if (reportsList) {
+        reportsList.addEventListener('click', (e) => {
+            const th = e.target.closest('.sortable-header');
+            if (!th) return;
+            const column = th.dataset.sort;
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = (column === 'id' || column === 'date') ? 'desc' : 'asc';
+            }
+            renderFilteredReports(true);
+        });
+    }
+
+    const resetBtn = document.getElementById('reset-sort-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            currentSortColumn = 'id';
+            currentSortDirection = 'desc';
+            renderFilteredReports(true);
         });
     }
 }

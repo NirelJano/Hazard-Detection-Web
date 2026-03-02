@@ -954,3 +954,32 @@ select.filter-input {
         padding: 0.35rem 0.6rem;
     }
 }
+
+/* ========== Table Sorting ========== */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s, background-color 0.2s;
+    position: relative;
+}
+
+.sortable-header:hover {
+    color: #f1f5f9;
+    background-color: rgba(148, 163, 184, 0.04);
+}
+
+.sort-icon {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.7rem;
+    color: #475569;
+    transition: color 0.2s;
+}
+
+.sortable-header.sort-active {
+    color: #60a5fa;
+}
+
+.sortable-header.sort-active .sort-icon {
+    color: #60a5fa;
+}
