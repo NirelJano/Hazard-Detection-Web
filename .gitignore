@@ -13,10 +13,14 @@ dist/
 # Misc
 .DS_Store
 .env
+env.js
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Firebase
+.firebase/
 
 # Logs
 npm-debug.log*
