@@ -281,12 +281,21 @@ select.filter-input {
 #reports-list {
     margin-top: 0.5rem;
     width: 100%;
+    /* Allow the table wrapper inside to scroll horizontally */
+    overflow: visible;
+}
+
+#reports-list .w-full.overflow-x-auto,
+.table-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Negative margin trick to let scroll reach the edges on mobile */
 }
 
 /* ========== Reports Table ========== */
 .reports-table {
     width: 100%;
-    min-width: 700px;
+    min-width: 580px;
     border-collapse: separate;
     border-spacing: 0;
     text-align: left;
@@ -306,6 +315,18 @@ select.filter-input {
     letter-spacing: 0.08em;
     color: #64748b;
     white-space: nowrap;
+    text-align: center;
+}
+
+/* Hazard Type header nudged left */
+.reports-table-header th[data-sort="hazardType"] {
+    padding-right: 12px;
+}
+
+/* Location header aligned right to match Hebrew content */
+.reports-table-header th[data-sort="location"] {
+    text-align: right;
+    padding-right: 20px;
 }
 
 /* -- Table Body Rows -- */
@@ -324,6 +345,7 @@ select.filter-input {
     color: #e2e8f0 !important;
     font-weight: 600 !important;
     vertical-align: middle;
+    text-align: center;
 }
 
 /* -- ID Column -- */
@@ -364,6 +386,8 @@ select.filter-input {
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 0;
+    text-align: right;
+    /* RTL text looks better right-aligned or left-aligned, but since it's Hebrew let's do right inside the cell */
 }
 
 /* -- Date Column -- */
@@ -693,11 +717,18 @@ select.filter-input {
 /* ========== Admin: Reports Section Header ========== */
 .reports-section-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .reports-section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
 }
 
 /* ========== Admin: Checkbox Column ========== */
@@ -722,6 +753,30 @@ select.filter-input {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .admin-toolbar {
+        /* Two-row layout on mobile: status group on top, danger+cleanup on bottom */
+        flex-direction: row;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    /* Make cleanup cloudinary button not push to its own line via margin-left:auto */
+    #cleanup-cloudinary-btn {
+        margin-left: 0 !important;
+        order: 3;
+    }
+
+    #delete-selected-btn {
+        order: 2;
+    }
+
+    .admin-toolbar-group {
+        order: 1;
+        flex: 0 0 auto;
+    }
 }
 
 .admin-toolbar.hidden {
@@ -946,12 +1001,18 @@ select.filter-input {
     }
 
     .admin-toolbar {
-        gap: 0.4rem;
+        gap: 0.35rem;
     }
 
     .admin-toolbar-btn {
-        font-size: 0.72rem;
-        padding: 0.35rem 0.6rem;
+        font-size: 0.7rem;
+        padding: 0.3rem 0.55rem;
+        gap: 0.25rem;
+    }
+
+    .admin-toolbar-btn svg {
+        width: 14px;
+        height: 14px;
     }
 }
 
