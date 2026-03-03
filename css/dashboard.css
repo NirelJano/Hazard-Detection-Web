@@ -326,6 +326,10 @@ select.filter-input {
 /* Hazard Type header nudged left */
 .reports-table-header th[data-sort="hazardType"] {
     padding-right: 12px;
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.2;
+    vertical-align: middle;
 }
 
 /* Location header aligned right to match Hebrew content */
