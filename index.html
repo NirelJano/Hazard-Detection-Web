@@ -246,7 +246,10 @@
 
       // ── 4. controllerchange: reload once the new SW takes over ────────
       // This fires after skipWaiting() completes and the new SW claims all clients.
+      let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
         console.log('[App] New SW controller active — reloading for fresh content.');
         window.location.reload();
       });
