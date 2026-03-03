@@ -295,7 +295,8 @@ select.filter-input {
 /* ========== Reports Table ========== */
 .reports-table {
     width: 100%;
-    min-width: 580px;
+    min-width: 950px;
+    /* Increased from 580px to prevent cramped headers */
     border-collapse: separate;
     border-spacing: 0;
     text-align: left;
@@ -308,13 +309,17 @@ select.filter-input {
 }
 
 .reports-table-header th {
-    padding: 12px 14px;
+    padding: 12px 8px;
+    /* Reduced from 12px 14px for better fit */
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     color: #64748b;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Ensures no visual overlap if text is too long */
     text-align: center;
 }
 

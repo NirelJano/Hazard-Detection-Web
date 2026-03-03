@@ -4,6 +4,8 @@
 
 import { auth, onAuthStateChanged } from '../firebase-config.js';
 
+console.log("Version: 1.0.5 - Build Time: " + new Date().toISOString());
+
 // ---------- Router ----------
 const routes = {
     login: 'pages/login.html',
