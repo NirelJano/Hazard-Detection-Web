@@ -8,7 +8,7 @@ importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.
 
 let model = null;
 const MODEL_PATH = '/assets/model/model.json'; // Path to your custom model
-const LABELS = ['Crack', 'Pothole', 'Bump', 'Debris']; // Swapped Crack and Pothole
+const LABELS = ['Crack', 'Pothole']; // Swapped Crack and Pothole
 const NMS_IOU_THRESHOLD = 0.5;
 const NMS_SCORE_THRESHOLD = 0.45;
 
@@ -286,11 +286,8 @@ async function runDetection(imageBitmap, speed) {
             // Run inference
             const predictions = await model.predict(batched);
 
-            // Parse results (adjust based on your model's output format)
-            const detections = await parseDetections(predictions, width, height);
-
-            // Apply Non-Maximum Suppression
-            filtered = await applyNMS(detections);
+            // Parse results (End-to-End model, no NMS required)
+            filtered = await parseDetections(predictions, width, height);
         } finally {
             tf.engine().endScope();
         }
@@ -343,9 +340,7 @@ async function runStaticDetection(imageBitmap) {
             const batched = normalized.expandDims(0);
 
             const predictions = await model.predict(batched);
-            const detections = await parseDetections(predictions, width, height);
-
-            filtered = await applyNMS(detections);
+            filtered = await parseDetections(predictions, width, height);
         } finally {
             tf.engine().endScope();
         }
@@ -366,107 +361,51 @@ async function runStaticDetection(imageBitmap) {
 }
 
 // ---------- Parse Detections ----------
-// YOLOv12 output format is typically: [batch_size, 4_bbox_coords + num_classes, num_anchors]
-// For this model: [1, 6, 8400] -> (x_center, y_center, width, height, class0_conf, class1_conf)
+// YOLO output format for end-to-end (NMS-free) models: [1, 300, 6]
+// where each row is: [x_min, y_min, x_max, y_max, score, class_id]
 async function parseDetections(predictions, origWidth, origHeight) {
     const detections = [];
 
     // Extract the output tensor
     const outputTensor = Array.isArray(predictions) ? predictions[0] : predictions;
 
-    // Squeeze the batch dimension and transpose from [6, 8400] to [8400, 6]
-    // so each row is a single detection anchor prediction
+    // Squeeze the batch dimension: [1, 300, 6] -> [300, 6]
     const squeezed = outputTensor.squeeze([0]);
-    const transposed = squeezed.transpose([1, 0]);
-    const data = await transposed.data();
+    const data = await squeezed.data();
 
-    const numAnchors = transposed.shape[0]; // should be 8400
-    const numFeatures = transposed.shape[1]; // should be 6
-    const numClasses = numFeatures - 4; // 2 classes in this case
+    const numBoxes = squeezed.shape[0];
 
-    for (let i = 0; i < numAnchors; i++) {
-        const offset = i * numFeatures;
+    for (let i = 0; i < numBoxes; i++) {
+        const offset = i * 6;
 
-        // Find best class confidence
-        let maxClassConf = -1;
-        let classId = -1;
-        for (let c = 0; c < numClasses; c++) {
-            const conf = data[offset + 4 + c];
-            if (conf > maxClassConf) {
-                maxClassConf = conf;
-                classId = c;
-            }
-        }
+        const score = data[offset + 4];
+        if (score < NMS_SCORE_THRESHOLD) continue;
 
-        // If below threshold, skip
-        if (maxClassConf < NMS_SCORE_THRESHOLD) continue;
+        const classId = Math.round(data[offset + 5]);
 
-        const xCenter = data[offset];
-        const yCenter = data[offset + 1];
-        const w = data[offset + 2];
-        const h = data[offset + 3];
+        // Output from YOLO TFJS is usually absolute coordinates relative to the input tensor (640)
+        let xmin = data[offset];
+        let ymin = data[offset + 1];
+        let xmax = data[offset + 2];
+        let ymax = data[offset + 3];
 
-        // Normalize coordinates (0-1) in case the model outputs 0-640 (tensor size)
-        // Some models output normalized coordinates, others do not.
-        const scaleX = xCenter > 1 ? 1 / 640 : 1;
-        const scaleY = yCenter > 1 ? 1 / 640 : 1;
-        const scaleW = w > 1 ? 1 / 640 : 1;
-        const scaleH = h > 1 ? 1 / 640 : 1;
+        // Normalize depending on the image dimensions scale
+        const scaleX = origWidth / 640;
+        const scaleY = origHeight / 640;
 
-        const normX = xCenter * scaleX;
-        const normY = yCenter * scaleY;
-        const normW = w * scaleW;
-        const normH = h * scaleH;
-
-        // Convert normalized coordinates to pixel coordinates for the original image
         detections.push({
             bbox: [
-                (normX - normW / 2) * origWidth,
-                (normY - normH / 2) * origHeight,
-                normW * origWidth,
-                normH * origHeight,
+                xmin * scaleX,
+                ymin * scaleY,
+                (xmax - xmin) * scaleX,
+                (ymax - ymin) * scaleY,
             ],
-            score: maxClassConf,
+            score: score,
             label: LABELS[classId] || `Class ${classId}`,
-            classId,
+            classId: classId,
         });
     }
 
     squeezed.dispose();
-    transposed.dispose();
-
     return detections;
-}
-
-// ---------- Non-Maximum Suppression ----------
-async function applyNMS(detections) {
-    if (detections.length === 0) return [];
-
-    const boxes = detections.map((d) => [
-        d.bbox[1], // y1
-        d.bbox[0], // x1
-        d.bbox[1] + d.bbox[3], // y2
-        d.bbox[0] + d.bbox[2], // x2
-    ]);
-    const scores = detections.map((d) => d.score);
-
-    const boxesTensor = tf.tensor2d(boxes);
-    const scoresTensor = tf.tensor1d(scores);
-
-    const nmsIndices = await tf.image.nonMaxSuppressionAsync(
-        boxesTensor,
-        scoresTensor,
-        20, // max detections
-        NMS_IOU_THRESHOLD,
-        NMS_SCORE_THRESHOLD
-    );
-
-    const indices = await nmsIndices.data();
-    const filtered = Array.from(indices).map((i) => detections[i]);
-
-    boxesTensor.dispose();
-    scoresTensor.dispose();
-    nmsIndices.dispose();
-
-    return filtered;
 }
