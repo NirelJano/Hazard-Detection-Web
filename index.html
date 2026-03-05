@@ -131,164 +131,29 @@
   <script type="module" src="/js/app.js"></script>
 
   <!-- =====================================================
-       PWA Update Toast Styles
-       ===================================================== -->
-  <style>
-    #pwa-update-toast {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%) translateY(120%);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 1rem;
-      background: #1e293b;
-      border: 1px solid #3b82f6;
-      border-radius: 0.75rem;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      font-family: 'Inter', system-ui, sans-serif;
-      font-size: 0.875rem;
-      color: #e2e8f0;
-      white-space: nowrap;
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      pointer-events: none;
-      opacity: 0;
-    }
-
-    #pwa-update-toast.show {
-      transform: translateX(-50%) translateY(0);
-      pointer-events: auto;
-      opacity: 1;
-    }
-
-    #pwa-update-toast svg {
-      flex-shrink: 0;
-      color: #3b82f6;
-    }
-
-    #pwa-update-refresh {
-      padding: 0.35rem 0.85rem;
-      background: #3b82f6;
-      color: #fff;
-      border: none;
-      border-radius: 0.5rem;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    #pwa-update-refresh:hover {
-      background: #2563eb;
-    }
-
-    #pwa-update-dismiss {
-      padding: 0.35rem 0.65rem;
-      background: transparent;
-      color: #94a3b8;
-      border: none;
-      border-radius: 0.5rem;
-      font-size: 0.8125rem;
-      cursor: pointer;
-      transition: color 0.2s;
-    }
-
-    #pwa-update-dismiss:hover {
-      color: #e2e8f0;
-    }
-  </style>
-
-  <!-- PWA Update Toast HTML -->
-  <div id="pwa-update-toast" role="alert" aria-live="polite">
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-    <span>New version available!</span>
-    <button id="pwa-update-refresh">Refresh</button>
-    <button id="pwa-update-dismiss" aria-label="Dismiss">✕</button>
-  </div>
-
-  <!-- =====================================================
-       Service Worker Registration + Update Detection
+       Service Worker Registration + Auto Update
        ===================================================== -->
   <script>
     (() => {
       if (!('serviceWorker' in navigator)) return;
 
-      let newWorker = null; // reference to the SW waiting to activate
-
-      // ── 1. Show / hide the toast ──────────────────────────────────────
-      function showUpdateToast() {
-        const toast = document.getElementById('pwa-update-toast');
-        if (toast) toast.classList.add('show');
-      }
-      function hideUpdateToast() {
-        const toast = document.getElementById('pwa-update-toast');
-        if (toast) toast.classList.remove('show');
-      }
-
-      // ── 2. "Refresh" button: tell the waiting SW to skip waiting ──────
-      document.getElementById('pwa-update-refresh').addEventListener('click', () => {
-        if (newWorker) {
-          // This message triggers self.skipWaiting() inside sw.js
-          newWorker.postMessage({ type: 'SKIP_WAITING' });
-        }
-        hideUpdateToast();
-      });
-
-      // ── 3. "Dismiss" button: close toast without updating ─────────────
-      document.getElementById('pwa-update-dismiss').addEventListener('click', hideUpdateToast);
-
-      // ── 4. controllerchange: reload once the new SW takes over ────────
-      // This fires after skipWaiting() completes and the new SW claims all clients.
+      // ── controllerchange: reload once the new SW takes over ────────
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        console.log('[App] New SW controller active — reloading for fresh content.');
-        window.location.reload();
+        if (!refreshing) {
+          refreshing = true;
+          console.log('[App] New SW controller active — reloading for fresh content.');
+          window.location.reload();
+        }
       });
 
-      // ── 5. Register the SW and watch for updates ──────────────────────
+      // ── Register the SW ─────────────────────────────────────────────
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').then((reg) => {
           console.log('[App] SW registered:', reg.scope);
 
-          // Helper that wires update detection to an SW registration object
-          function trackUpdate(registration) {
-            // An SW is already waiting (e.g. page was refreshed while an update was pending)
-            if (registration.waiting) {
-              newWorker = registration.waiting;
-              showUpdateToast();
-              return;
-            }
-
-            // Watch for an update that is currently installing
-            registration.addEventListener('updatefound', () => {
-              const installing = registration.installing;
-              if (!installing) return;
-
-              installing.addEventListener('statechange', () => {
-                if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                  // A new SW is installed and waiting — existing SW still controls the page
-                  console.log('[App] New SW installed and waiting.');
-                  newWorker = installing;
-                  showUpdateToast();
-                }
-              });
-            });
-          }
-
-          trackUpdate(reg);
-
-          // Also poll for updates in long-lived sessions (every 60 s)
+          // Poll for updates in long-lived sessions (every 60 s)
           setInterval(() => reg.update(), 60_000);
-
         }).catch((err) => {
           console.warn('[App] SW registration failed:', err);
         });

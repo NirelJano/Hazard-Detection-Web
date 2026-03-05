@@ -36,24 +36,14 @@ const ASSETS_TO_CACHE = [
 
 
 // Install: Cache core assets.
-// NOTE: We do NOT call self.skipWaiting() here automatically.
-// The update toast in the page will send a SKIP_WAITING message when the user
-// explicitly clicks "Refresh", giving us a controlled, user-approved update.
 self.addEventListener('install', (event) => {
+  self.skipWaiting(); // Force the waiting service worker to become the active service worker
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Caching core assets v' + CACHE_VERSION);
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
-});
-
-// Message: Listen for SKIP_WAITING sent by the update toast "Refresh" button.
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] Received SKIP_WAITING — activating new version.');
-    self.skipWaiting();
-  }
 });
 
 // Activate: Clean up old caches
