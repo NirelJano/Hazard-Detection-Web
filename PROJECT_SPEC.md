@@ -11,7 +11,7 @@ A high-performance **Mobile-First Progressive Web App (PWA)** designed to identi
 | Category       | Technology                                          |
 | -------------- | --------------------------------------------------- |
 | Frontend       | HTML5, Tailwind CSS, JavaScript (ES6+)              |
-| ML Engine      | TensorFlow.js (Custom YOLOv12-based Model)          |
+| ML Engine      | TensorFlow.js (Custom YOLO26n-based Model)          |
 | Performance    | Web Workers (Inference Offloading)                  |
 | PWA Features   | Service Workers (Caching/Offline), manifest.json    |
 | Backend/DB     | Google Firebase (Auth, Firestore, Analytics)        |
@@ -135,7 +135,7 @@ Role-based access is strictly enforced via Firestore Security Rules.
 │   ├── live-detection.js   # Live camera feed, tracking, auto-save
 │   ├── settings.js         # User profile and preferences
 │   ├── upload.js           # Static image upload, Cloudinary api
-│   └── worker.js           # TFJS Web Worker for YOLOv12 inference
+│   └── worker.js           # TFJS Web Worker for YOLO26n inference
 │
 ├── pages/
 │   ├── login.html          # Authentication view

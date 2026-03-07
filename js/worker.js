@@ -83,7 +83,7 @@ class TrackManager {
         // Adaptive Confidence (Step 3): > 50km/h = ~13.8 m/s
         if (speed > 13.8) {
             confThreshold = 0.35; // Catch blurred objects, but bounded slightly higher than before (was 0.35)
-            requiredHits = 2;     // Require LESS frames to be confirmed since objects pass quickly
+            requiredHits = 1;     // Require LESS frames to be confirmed since objects pass quickly
         }
 
         // Increment age
