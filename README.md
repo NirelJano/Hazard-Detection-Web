@@ -91,13 +91,10 @@ To ensure a continuous UI at **60 FPS**, the ML model inference is offloaded to 
 ---
 
 ## 📱 Screenshots
-*(Add your screenshots here)*
 
-| Live Detection | Dashboard Map | Report Table |
+| Static Detection | Dashboard Map | Report Table |
 |:---:|:---:|:---:|
-| <img src="https://via.placeholder.com/250x500.png?text=Live+Detection" width="200" alt="Live detection view"/> | <img src="https://via.placeholder.com/250x500.png?text=Map+Dashboard" width="200" alt="Dashboard map view"/> | <img src="https://via.placeholder.com/250x500.png?text=Report+Table" width="200" alt="Report table view"/> |
-
-*(Replace the placeholder URLs with actual app screenshots)*
+| <img src="assets/screenshots/static_detection.png" width="250" alt="Static Detection View"/> | <img src="assets/screenshots/dashboard_map.png" width="250" alt="Dashboard Map View"/> | <img src="assets/screenshots/report_table.png" width="250" alt="Report Table View"/> |
 
 ---
 
