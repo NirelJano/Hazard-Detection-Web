@@ -71,7 +71,7 @@ function setupWorker() {
     };
 
     // Defer model loading until after First Paint for better LCP
-    const startModelLoad = () => worker.postMessage({ type: 'load-model' });
+    const startModelLoad = () => worker.postMessage({ type: 'load-model', target: 'live' });
     if ('requestIdleCallback' in self) {
         requestIdleCallback(startModelLoad);
     } else {
