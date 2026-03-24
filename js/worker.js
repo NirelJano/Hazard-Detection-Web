@@ -11,8 +11,8 @@ let currentModelType = null; // 'live' or 'static'
 const MODEL_PATH_LIVE = '/assets/models/YOLO12n/model.json';
 const MODEL_PATH_STATIC = '/assets/models/YOLO26n/model.json';
 const LABELS = ['Crack', 'Pothole']; // Swapped Crack and Pothole
-const NMS_IOU_THRESHOLD = 0.5;
-const NMS_SCORE_THRESHOLD = 0.45;
+const NMS_IOU_THRESHOLD = 0.45;
+const NMS_SCORE_THRESHOLD = 0.4;
 
 // ---------- Message Handler ----------
 self.onmessage = async (e) => {
@@ -92,7 +92,7 @@ class TrackManager {
 
         // Adaptive Confidence (Step 3): > 50km/h = ~13.8 m/s
         if (speed > 13.8) {
-            confThreshold = 0.35; // Catch blurred objects, but bounded slightly higher than before (was 0.35)
+            confThreshold = 0.3; // Catch blurred objects, but bounded slightly higher than before (was 0.35)
             requiredHits = 1;     // Require LESS frames to be confirmed since objects pass quickly
         }
 
