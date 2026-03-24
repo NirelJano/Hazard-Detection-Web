@@ -8,6 +8,7 @@ console.log("Version: 1.0.5 - Build Time: " + new Date().toISOString());
 
 // ---------- Router ----------
 const routes = {
+    home: 'pages/home.html',
     login: 'pages/login.html',
     register: 'pages/register.html',
     dashboard: 'pages/dashboard.html',
@@ -104,11 +105,14 @@ import('../js/auth.js').then(async mod => {
                 navigateTo('dashboard');
             }
         } else {
-            // Not signed in – show login (allow register too)
+            // Not signed in – show landing page, unless auth/protected routes were requested
+            const protectedRoutes = ['dashboard', 'upload', 'live-detection', 'settings'];
             if (hash === 'register') {
                 navigateTo('register');
-            } else {
+            } else if (hash === 'login' || protectedRoutes.includes(hash)) {
                 navigateTo('login');
+            } else {
+                navigateTo('home');
             }
         }
     });

@@ -1,0 +1,351 @@
+<link rel="stylesheet" href="../css/home.css">
+
+<div class="landing-page min-h-screen text-white">
+    <div class="landing-grid"></div>
+    <div class="landing-orb landing-orb-blue"></div>
+    <div class="landing-orb landing-orb-purple"></div>
+    <div class="landing-orb landing-orb-cyan"></div>
+
+    <header class="relative z-10 px-6 pt-6 lg:px-10 lg:pt-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="landing-surface rounded-3xl px-5 py-4 lg:px-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl gradient-accent flex items-center justify-center shadow-lg shadow-primary-500/30">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 3l8.5 15a1 1 0 01-.87 1.5H4.37a1 1 0 01-.87-1.5L12 3zm0 5v4m0 4h.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold">Road Hazard Detection</p>
+                        <p class="text-sm text-dark-400">AI-powered road safety, reporting, and field operations</p>
+                    </div>
+                </div>
+
+                <nav class="hidden lg:flex items-center gap-3 text-sm text-dark-300">
+                    <a href="#" onclick="document.getElementById('capabilities')?.scrollIntoView({ behavior: 'smooth' }); return false;" class="px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">Capabilities</a>
+                    <a href="#" onclick="document.getElementById('workflow')?.scrollIntoView({ behavior: 'smooth' }); return false;" class="px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">Workflow</a>
+                    <a href="#" onclick="document.getElementById('screens')?.scrollIntoView({ behavior: 'smooth' }); return false;" class="px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">Screens</a>
+                    <a href="#" onclick="document.getElementById('stack')?.scrollIntoView({ behavior: 'smooth' }); return false;" class="px-3 py-2 rounded-xl hover:bg-white/5 transition-colors">Stack</a>
+                </nav>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="navigateTo('login')" class="btn btn-secondary">Sign In</button>
+                    <button onclick="navigateTo('register')" class="btn btn-primary">Get Started</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="relative z-10 px-6 pb-16 lg:px-10 lg:pb-24">
+        <section class="max-w-7xl mx-auto pt-14 pb-12 lg:pt-20 lg:pb-20">
+            <div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+                <div class="animate-fade-in">
+                    <span class="section-kicker mb-6">
+                        <span class="w-2 h-2 rounded-full bg-primary-400"></span>
+                        Mobile-first road intelligence platform
+                    </span>
+
+                    <h1 class="text-4xl md:text-5xl xl:text-6xl font-extrabold leading-tight tracking-tight mt-6">
+                        Detect, geotag, and triage road hazards with
+                        <span class="bg-gradient-to-r from-primary-300 via-white to-violet-300 bg-clip-text text-transparent">real-time AI</span>.
+                    </h1>
+
+                    <p class="mt-6 text-lg md:text-xl text-dark-300 max-w-2xl leading-relaxed">
+                        A production-ready PWA that spots potholes, cracks, bumps, and debris in the browser,
+                        enriches reports with live geolocation, and gives teams a powerful dashboard to respond faster.
+                    </p>
+
+                    <div class="mt-8 flex flex-wrap gap-3">
+                        <span class="stack-pill">TensorFlow.js + YOLO26n</span>
+                        <span class="stack-pill">Web Worker inference</span>
+                        <span class="stack-pill">Mapbox + reverse geocoding</span>
+                        <span class="stack-pill">Firebase + Cloudinary</span>
+                    </div>
+
+                    <div class="mt-8 grid gap-3 sm:grid-cols-2">
+                        <div class="metric-tile rounded-2xl p-4">
+                            <p class="text-3xl font-bold text-white">60 FPS</p>
+                            <p class="mt-1 text-sm text-dark-400">Smooth UI maintained by offloading inference to a dedicated worker thread.</p>
+                        </div>
+                        <div class="metric-tile rounded-2xl p-4">
+                            <p class="text-3xl font-bold text-white">Live GPS</p>
+                            <p class="mt-1 text-sm text-dark-400">Each report is enriched with coordinates, address data, and source context.</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-8 flex flex-col sm:flex-row gap-4">
+                        <button onclick="navigateTo('register')" class="btn btn-primary px-7 py-4 text-base">Create Account</button>
+                        <button onclick="navigateTo('login')" class="btn btn-secondary px-7 py-4 text-base">Open the App</button>
+                    </div>
+
+                    <div class="mt-8 grid gap-3 text-sm text-dark-300 sm:grid-cols-2">
+                        <div class="flex items-start gap-3 rounded-2xl landing-outline p-4">
+                            <span class="mt-1 w-2.5 h-2.5 rounded-full bg-success"></span>
+                            <p>Real-time live detection with IoU tracking, cooldown protection, and auto-save logic.</p>
+                        </div>
+                        <div class="flex items-start gap-3 rounded-2xl landing-outline p-4">
+                            <span class="mt-1 w-2.5 h-2.5 rounded-full bg-primary-400"></span>
+                            <p>Manual photo upload flow with EXIF GPS extraction, browser location fallback, and secure cloud storage.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative animate-slide-up">
+                    <div class="hero-screenshot lg:ml-12">
+                        <img src="/assets/screenshots/dashboard_map.png" alt="Dashboard map preview"
+                            class="w-full h-full object-cover" />
+                    </div>
+
+                    <div class="landing-surface rounded-2xl p-4 mt-4 lg:mt-0 lg:absolute lg:-top-8 lg:-left-6 max-w-xs floating-card">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                            <p class="text-xs uppercase tracking-widest text-primary-300">Live AI Detection</p>
+                                <p class="mt-2 text-xl font-semibold">Frame-by-frame hazard tracking</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-2xl bg-success/15 text-success flex items-center justify-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-sm text-dark-400">Tracks hazards across frames and prevents duplicate reports during motion.</p>
+                    </div>
+
+                    <div class="grid gap-4 mt-4 sm:grid-cols-2 lg:absolute lg:-bottom-10 lg:left-8 lg:right-0">
+                        <div class="hero-screenshot floating-card-delay">
+                            <img src="/assets/screenshots/static_detection.png" alt="Static detection preview"
+                                class="w-full h-full object-cover" />
+                        </div>
+
+                        <div class="landing-surface rounded-2xl p-5 floating-card">
+                            <p class="text-xs uppercase tracking-widest text-violet-300">Operations-ready workflow</p>
+                            <div class="mt-4 space-y-4">
+                                <div class="flex items-start gap-3">
+                                    <span class="w-8 h-8 rounded-xl bg-primary-500/15 text-primary-300 flex items-center justify-center text-sm font-bold">1</span>
+                                    <div>
+                                        <p class="font-semibold">Capture and detect</p>
+                                        <p class="text-sm text-dark-400">Camera stream or uploaded media is analyzed in-browser.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <span class="w-8 h-8 rounded-xl bg-warning/15 text-warning flex items-center justify-center text-sm font-bold">2</span>
+                                    <div>
+                                        <p class="font-semibold">Geotag and validate</p>
+                                        <p class="text-sm text-dark-400">Reports are enriched with GPS, reverse geocoding, and metadata.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <span class="w-8 h-8 rounded-xl bg-success/15 text-success flex items-center justify-center text-sm font-bold">3</span>
+                                    <div>
+                                        <p class="font-semibold">Prioritize on the dashboard</p>
+                                        <p class="text-sm text-dark-400">Teams review hazards on the map, in filters, and in detailed tables.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="capabilities" class="max-w-7xl mx-auto py-10 lg:py-16">
+            <div class="max-w-3xl">
+                <span class="section-kicker">System capabilities</span>
+                <h2 class="mt-6 text-3xl md:text-4xl font-bold tracking-tight">Everything the platform does, aligned into one fast field-to-dashboard workflow.</h2>
+                <p class="mt-4 text-lg text-dark-300">The content below is based directly on the project architecture and feature set documented in the repository README.</p>
+            </div>
+
+            <div class="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                <article class="feature-card rounded-3xl p-6">
+                    <div class="w-12 h-12 rounded-2xl bg-primary-500/15 text-primary-300 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 10l4.55-2.27A1 1 0 0121 8.62v6.76a1 1 0 01-1.45.89L15 14m-9 5h8a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <h3 class="mt-5 text-xl font-semibold">Live Detection</h3>
+                    <p class="mt-3 text-dark-400 leading-relaxed">Runs real-time object detection in the browser, tracks hazards with IoU, and applies anti-spam cooldowns before saving.</p>
+                    <ul class="mt-5 space-y-2 text-sm text-dark-300">
+                        <li>On-device inference via TensorFlow.js</li>
+                        <li>Worker-based architecture for fluid UI</li>
+                        <li>Auto-save after stable consecutive hits</li>
+                    </ul>
+                </article>
+
+                <article class="feature-card rounded-3xl p-6">
+                    <div class="w-12 h-12 rounded-2xl bg-success/15 text-success flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 15a4 4 0 014-4h.26A8 8 0 1121 16.3M16 16l-4-4-4 4m4-4v9" />
+                        </svg>
+                    </div>
+                    <h3 class="mt-5 text-xl font-semibold">Smart Reporting</h3>
+                    <p class="mt-3 text-dark-400 leading-relaxed">Creates structured hazard reports from live camera or uploaded images with GPS extraction, address lookup, and image upload.</p>
+                    <ul class="mt-5 space-y-2 text-sm text-dark-300">
+                        <li>Camera and gallery capture flow</li>
+                        <li>EXIF metadata parsing and location fallback</li>
+                        <li>Cloudinary storage with cleanup safeguards</li>
+                    </ul>
+                </article>
+
+                <article class="feature-card rounded-3xl p-6">
+                    <div class="w-12 h-12 rounded-2xl bg-violet-500/15 text-violet-300 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 01.553-.894L9 2m0 18l6-2m-6 2V2m6 16l5.447-2.724A1 1 0 0021 14.382V3.618a1 1 0 00-.553-.894L15 0m0 18V0m0 0L9 2" />
+                        </svg>
+                    </div>
+                    <h3 class="mt-5 text-xl font-semibold">Map + Dashboard</h3>
+                    <p class="mt-3 text-dark-400 leading-relaxed">Visualizes reports with Mapbox GL JS, custom markers, popups, filters, report tables, and operational status workflows.</p>
+                    <ul class="mt-5 space-y-2 text-sm text-dark-300">
+                        <li>Interactive map with fly-to navigation</li>
+                        <li>Filtering by status, type, date, and reporter</li>
+                        <li>Report table with image previews and actions</li>
+                    </ul>
+                </article>
+
+                <article class="feature-card rounded-3xl p-6">
+                    <div class="w-12 h-12 rounded-2xl bg-warning/15 text-warning flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 11c0 .92-.75 1.67-1.67 1.67S8.67 11.92 8.67 11 9.42 9.33 10.33 9.33 12 10.08 12 11zm0 0V7m2 12H6a2 2 0 01-2-2V7a2 2 0 012-2h8m0 14h4a2 2 0 002-2v-5m-6 7V5m0 0l3 3m-3-3L11 8" />
+                        </svg>
+                    </div>
+                    <h3 class="mt-5 text-xl font-semibold">Secure PWA Platform</h3>
+                    <p class="mt-3 text-dark-400 leading-relaxed">Brings authentication, role-aware data access, installability, caching, and mobile-first performance into one secure delivery layer.</p>
+                    <ul class="mt-5 space-y-2 text-sm text-dark-300">
+                        <li>Firebase Auth with email and Google sign-in</li>
+                        <li>Firestore rules for protected data access</li>
+                        <li>Installable standalone app experience</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
+        <section id="workflow" class="max-w-7xl mx-auto py-10 lg:py-16">
+            <div class="landing-surface rounded-3xl p-6 md:p-8 lg:p-10">
+                <div class="grid gap-10 lg:grid-cols-2 lg:items-start">
+                    <div>
+                        <span class="section-kicker">Detection to decision</span>
+                        <h2 class="mt-6 text-3xl md:text-4xl font-bold tracking-tight">Built to keep the interface responsive while the AI keeps working in the background.</h2>
+                        <p class="mt-4 text-lg text-dark-300">The main thread stays focused on the user experience while a dedicated worker handles model loading, inference, and result delivery.</p>
+
+                        <div class="mt-8 grid gap-4 sm:grid-cols-2">
+                            <div class="landing-outline rounded-2xl p-5">
+                                <p class="text-xs uppercase tracking-widest text-primary-300">Main thread</p>
+                                <p class="mt-3 text-xl font-semibold">UI, camera rendering, map updates, and overlays</p>
+                                <p class="mt-3 text-sm text-dark-400">Keeps the app interactive while detections, markers, and report state stay in sync.</p>
+                            </div>
+                            <div class="landing-outline rounded-2xl p-5">
+                                <p class="text-xs uppercase tracking-widest text-violet-300">Worker thread</p>
+                                <p class="mt-3 text-xl font-semibold">TensorFlow.js inference, parsing, and hazard geometry</p>
+                                <p class="mt-3 text-sm text-dark-400">Runs detection logic off the main thread to preserve fluid mobile performance.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="workflow-line pl-12 relative">
+                            <span class="absolute left-0 top-0 w-9 h-9 rounded-2xl bg-primary-500/15 text-primary-300 flex items-center justify-center font-bold">1</span>
+                            <h3 class="text-xl font-semibold">Capture a frame or upload an image</h3>
+                            <p class="mt-2 text-dark-400">The platform accepts live camera input or static media from the device gallery.</p>
+                        </div>
+                        <div class="workflow-line pl-12 relative">
+                            <span class="absolute left-0 top-0 w-9 h-9 rounded-2xl bg-warning/15 text-warning flex items-center justify-center font-bold">2</span>
+                            <h3 class="text-xl font-semibold">Detect hazards and stabilize results</h3>
+                            <p class="mt-2 text-dark-400">Detection results are filtered, tracked across frames, and protected against duplicate spam.</p>
+                        </div>
+                        <div class="workflow-line pl-12 relative">
+                            <span class="absolute left-0 top-0 w-9 h-9 rounded-2xl bg-success/15 text-success flex items-center justify-center font-bold">3</span>
+                            <h3 class="text-xl font-semibold">Attach location and address intelligence</h3>
+                            <p class="mt-2 text-dark-400">The app combines GPS, reverse geocoding, and metadata extraction to create rich context for every hazard.</p>
+                        </div>
+                        <div class="workflow-line pl-12 relative">
+                            <span class="absolute left-0 top-0 w-9 h-9 rounded-2xl bg-violet-500/15 text-violet-300 flex items-center justify-center font-bold">4</span>
+                            <h3 class="text-xl font-semibold">Review, filter, and manage the report lifecycle</h3>
+                            <p class="mt-2 text-dark-400">Operators use the dashboard to prioritize issues, inspect evidence, and update report status securely.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screens" class="max-w-7xl mx-auto py-10 lg:py-16">
+            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div class="max-w-3xl">
+                    <span class="section-kicker">Product screens</span>
+                    <h2 class="mt-6 text-3xl md:text-4xl font-bold tracking-tight">A clear experience for field reporting and back-office operations.</h2>
+                </div>
+                <p class="text-dark-300 max-w-xl">These views showcase the static detection experience, the operational map, and the report management table already present in the app.</p>
+            </div>
+
+            <div class="mt-10 grid gap-5 lg:grid-cols-3">
+                <article class="landing-surface rounded-3xl overflow-hidden">
+                    <img src="/assets/screenshots/static_detection.png" alt="Static detection screen"
+                        class="w-full h-72 object-cover object-top" />
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold">Static Detection</h3>
+                        <p class="mt-3 text-dark-400">Upload an image, run inference, extract location information, and submit a complete report from one streamlined screen.</p>
+                    </div>
+                </article>
+
+                <article class="landing-surface rounded-3xl overflow-hidden">
+                    <img src="/assets/screenshots/dashboard_map.png" alt="Dashboard map screen"
+                        class="w-full h-72 object-cover object-top" />
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold">Dashboard Map</h3>
+                        <p class="mt-3 text-dark-400">View hazards geographically, inspect locations quickly, and navigate across active reports with rich map interactions.</p>
+                    </div>
+                </article>
+
+                <article class="landing-surface rounded-3xl overflow-hidden">
+                    <img src="/assets/screenshots/report_table.png" alt="Report table screen"
+                        class="w-full h-72 object-cover object-top" />
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold">Report Table</h3>
+                        <p class="mt-3 text-dark-400">Filter, review, and manage incidents through a structured table designed for quick operational decisions.</p>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section id="stack" class="max-w-7xl mx-auto py-10 lg:py-16">
+            <div class="landing-surface rounded-3xl p-6 md:p-8 lg:p-10">
+                <div class="grid gap-8 lg:grid-cols-2 lg:items-center">
+                    <div>
+                        <span class="section-kicker">Tech stack</span>
+                        <h2 class="mt-6 text-3xl md:text-4xl font-bold tracking-tight">Modern web delivery, cloud-backed data, and browser-native ML.</h2>
+                        <p class="mt-4 text-lg text-dark-300">The platform combines a mobile-first PWA architecture with client-side inference, secure authentication, cloud persistence, and mapping services.</p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                        <span class="stack-pill">Progressive Web App</span>
+                        <span class="stack-pill">TensorFlow.js</span>
+                        <span class="stack-pill">YOLO26n model</span>
+                        <span class="stack-pill">Web Workers</span>
+                        <span class="stack-pill">Firebase Auth</span>
+                        <span class="stack-pill">Firestore</span>
+                        <span class="stack-pill">Cloudinary</span>
+                        <span class="stack-pill">Mapbox GL JS</span>
+                        <span class="stack-pill">OSM Nominatim</span>
+                        <span class="stack-pill">EXIF GPS parsing</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="max-w-7xl mx-auto py-10 lg:py-16">
+            <div class="landing-surface rounded-3xl p-8 md:p-10 lg:p-12 text-center">
+                <span class="section-kicker justify-center">Ready to launch</span>
+                <h2 class="mt-6 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">Turn road observations into actionable hazard reports.</h2>
+                <p class="mt-5 text-lg text-dark-300 max-w-3xl mx-auto">Sign in to continue or create a new account to start using the detection pipeline, geolocation workflow, and dashboard tools.</p>
+                <div class="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+                    <button onclick="navigateTo('login')" class="btn btn-secondary px-7 py-4 text-base">Sign In</button>
+                    <button onclick="navigateTo('register')" class="btn btn-primary px-7 py-4 text-base">Create Account</button>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>

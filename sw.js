@@ -2,11 +2,12 @@
 // Service Worker - Road Hazard Detection PWA
 // ============================================
 
-const CACHE_VERSION = '19'; // PWA auto-update: controlled skipWaiting via message
+const CACHE_VERSION = '20'; // PWA auto-update: controlled skipWaiting via message
 const CACHE_NAME = 'hazard-detect-v' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/pages/home.html',
   '/pages/login.html',
   '/pages/register.html',
   '/pages/dashboard.html',
@@ -14,6 +15,7 @@ const ASSETS_TO_CACHE = [
   '/pages/live-detection.html',
   '/pages/settings.html',
   '/css/styles.css',
+  '/css/home.css',
   '/css/dashboard.css',
   '/css/upload.css',
   '/css/live-detection.css',
@@ -29,9 +31,16 @@ const ASSETS_TO_CACHE = [
   '/js/settings.js',
   '/js/geocode.js',
   '/manifest.json',
-  '/robots.txt',
-  '/assets/model/model.json',
-  '/assets/model/group1-shard1of1.bin'
+  '/assets/icons/icon-192.png',
+  '/assets/icons/icon-512.png',
+  '/assets/screenshots/static_detection.png',
+  '/assets/screenshots/dashboard_map.png',
+  '/assets/screenshots/report_table.png',
+  '/assets/models/YOLO12n/model.json',
+  '/assets/models/YOLO12n/group1-shard1of1.bin',
+  '/assets/models/YOLO26n/model.json',
+  '/assets/models/YOLO26n/group1-shard1of2.bin',
+  '/assets/models/YOLO26n/group1-shard2of2.bin'
 ];
 
 
