@@ -196,11 +196,43 @@ async function bulkUpdateStatus(newStatus) {
             batch.update(doc(db, 'reports', docId), { status: newStatus });
         });
         await batch.commit();
-        showToast(`Updated ${selectedIds.size} report(s) to "${newStatus}"`, 'success');
+
+        // Update local state to reflect changes immediately without refresh
+        allReports.forEach(report => {
+            if (selectedIds.has(report.docId)) {
+                report.status = newStatus;
+            }
+        });
+
+        // Clear selection to reset UI
         clearSelection();
+
+        showToast(`Updated reports to "${newStatus}"`, 'success');
+        
+        // Force a complete re-render of the table and statistics
+        renderFilteredReports(false); 
     } catch (err) {
         console.error('[Admin] Bulk status update error:', err);
         showToast('Failed to update status', 'error');
+    }
+}
+
+async function updateSingleReportStatus(docId, newStatus) {
+    try {
+        await updateDoc(doc(db, 'reports', docId), { status: newStatus });
+
+        // Update local state
+        const report = allReports.find(r => r.docId === docId);
+        if (report) {
+            report.status = newStatus;
+        }
+
+        showToast(`Status updated to "${newStatus}"`, 'success');
+        renderFilteredReports(false); // Re-render to update counters and UI
+    } catch (err) {
+        console.error('[Admin] Single status update error:', err);
+        showToast('Failed to update status', 'error');
+        renderFilteredReports(false); // Re-render to revert UI if needed
     }
 }
 
@@ -437,6 +469,20 @@ export function renderFilteredReports(resetPage = true) {
 
                 updateToolbarState();
             }
+
+            // Status change listener (for interactive status badges)
+            document.querySelectorAll('.status-select-overlay').forEach(select => {
+                select.addEventListener('change', async (e) => {
+                    const docId = e.target.dataset.docId;
+                    const newStatus = e.target.value;
+                    if (docId && newStatus) {
+                        // Disable select while updating
+                        e.target.disabled = true;
+                        e.target.closest('.status-interactive-wrapper').classList.add('updating');
+                        await updateSingleReportStatus(docId, newStatus);
+                    }
+                });
+            });
         }
     }
 
@@ -520,7 +566,20 @@ function renderReportRow(report) {
         />
       </td>
       <td class="report-cell">
-        <span class="badge ${statusClass}">${report.status || 'new'}</span>
+        ${_isAdmin ? `
+          <div class="status-interactive-wrapper">
+            <select class="status-select-overlay" data-doc-id="${docId}">
+              <option value="new" ${report.status === 'new' ? 'selected' : ''}>New</option>
+              <option value="in-progress" ${report.status === 'in-progress' ? 'selected' : ''}>In Progress</option>
+              <option value="fixed" ${report.status === 'fixed' ? 'selected' : ''}>Fixed</option>
+            </select>
+            <div class="status-capsule-display">
+               <span class="badge ${statusClass}">${report.status || 'new'}</span>
+            </div>
+          </div>
+        ` : `
+          <span class="badge ${statusClass}">${report.status || 'new'}</span>
+        `}
       </td>
       <td class="report-cell"><span class="report-reporter">${report.reportedBy || 'Unknown'}</span></td>
     </tr>`;
