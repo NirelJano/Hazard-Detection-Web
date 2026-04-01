@@ -151,18 +151,22 @@ export function applyFilters(reports) {
 
         // Date range
         if (activeFilters.dateFrom || activeFilters.dateTo) {
-            const reportDate = parseReportDate(report.date);
+            const reportDate = parseReportDate(report.date || '');
             if (!reportDate) return false;
 
             if (activeFilters.dateFrom) {
                 const from = new Date(activeFilters.dateFrom);
-                from.setHours(0, 0, 0, 0);
-                if (reportDate < from) return false;
+                if (!isNaN(from.getTime())) {
+                    from.setHours(0, 0, 0, 0);
+                    if (reportDate < from) return false;
+                }
             }
             if (activeFilters.dateTo) {
                 const to = new Date(activeFilters.dateTo);
-                to.setHours(23, 59, 59, 999);
-                if (reportDate > to) return false;
+                if (!isNaN(to.getTime())) {
+                    to.setHours(23, 59, 59, 999);
+                    if (reportDate > to) return false;
+                }
             }
         }
 

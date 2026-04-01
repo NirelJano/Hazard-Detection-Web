@@ -6,8 +6,9 @@ import {
     where,
     doc,
     getDoc,
-    getDocs
+    onSnapshot
 } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js';
+
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js';
 
 import { initMap } from './dashboard-map.js';
@@ -23,6 +24,8 @@ import {
 } from './dashboard-reports.js';
 
 export let isAdmin = false;  // Populated after auth check
+let unsubscribeReports = null; // Store realtime listener
+
 
 export async function init() {
     setupLogout();
@@ -97,26 +100,45 @@ async function loadReports() {
         // Build query: all authenticated users can see ALL reports
         const q = query(collection(db, 'reports'));
 
-        const snapshot = await getDocs(q);
+        // Clear existing listener if loadReports is called again
+        if (unsubscribeReports) {
+            unsubscribeReports();
+        }
 
-        const reports = [];
-        snapshot.forEach((docSnap) => reports.push({ docId: docSnap.id, ...docSnap.data() }));
+        // Use onSnapshot for real-time updates (creations, deletions, edits)
+        unsubscribeReports = onSnapshot(q, (snapshot) => {
+            const reports = [];
+            snapshot.forEach((docSnap) => reports.push({ docId: docSnap.id, ...docSnap.data() }));
 
-        // Sort by id descending (newest first)
-        reports.sort((a, b) => (b.id || 0) - (a.id || 0));
+            // Log change context for debugging
+            const changes = snapshot.docChanges();
+            if (changes.length > 0) {
+                console.log(`[Dashboard] Snapshot sync: ${changes.length} change(s). Total reports: ${reports.length}`);
+                changes.forEach(change => {
+                    console.log(`[Dashboard] Change type: ${change.type}, ID: ${change.doc.id}`);
+                });
+            }
 
-        // Store all reports (unfiltered)
-        setAllReports(reports);
+            // Sort by id descending (newest first)
+            reports.sort((a, b) => (b.id || 0) - (a.id || 0));
 
-        // Populate dynamic filter options
-        populateFilterOptions(reports);
+            // Store all reports (unfiltered)
+            setAllReports(reports);
 
-        // Render with current filters applied (also updates map markers)
-        // Per-page display (25/50/100) is handled by dashboard-reports.js pagination
-        renderFilteredReports();
+            // Populate dynamic filter options
+            populateFilterOptions(reports);
+
+            // Render with current filters applied. 
+            // Pass 'false' to preserve the user's current pagination page during live updates.
+            renderFilteredReports(false);
+        }, (err) => {
+            console.error('[Dashboard] Real-time listener error:', err);
+            showToast('Lost connection to live reports', 'error');
+        });
 
     } catch (err) {
-        console.error('[Dashboard] Firestore query error:', err);
+        console.error('[Dashboard] Failed to set up real-time listener:', err);
         showToast('Failed to load reports', 'error');
     }
+
 }

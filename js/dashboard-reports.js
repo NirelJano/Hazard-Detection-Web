@@ -239,14 +239,21 @@ async function updateSingleReportStatus(docId, newStatus) {
 async function bulkDelete() {
     if (selectedIds.size === 0) return;
     const count = selectedIds.size;
+    const idsToRemove = new Set(selectedIds);
+    
+    // Optimistic local update
+    allReports = allReports.filter(r => !idsToRemove.has(r.docId));
+    clearSelection();
+    renderFilteredReports(false);
+
     try {
         const batch = writeBatch(db);
-        selectedIds.forEach(docId => {
+        idsToRemove.forEach(docId => {
             batch.delete(doc(db, 'reports', docId));
         });
+        
         await batch.commit();
         showToast(`Deleted ${count} report(s)`, 'success');
-        clearSelection();
     } catch (err) {
         console.error('[Admin] Bulk delete error:', err);
         showToast('Failed to delete reports', 'error');
