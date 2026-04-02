@@ -103,19 +103,31 @@ function clearFilters() {
     if (onFilterChangeCallback) onFilterChangeCallback();
 }
 
-// Parse "DD/MM/YY HH:MM" → Date object
-function parseReportDate(dateStr) {
-    if (!dateStr || typeof dateStr !== 'string') return null;
+// Parse "DD/MM/YY HH:MM" or Firestore Timestamps → Date object
+export function parseReportDate(dateVal) {
+    if (!dateVal) return null;
+    
+    // Handle Firestore Timestamps
+    if (typeof dateVal === 'object' && dateVal.toDate) {
+        return dateVal.toDate();
+    }
+    
+    if (typeof dateVal !== 'string') {
+        const d = new Date(dateVal);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
     // Try DD/MM/YY HH:MM
-    const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(\d{1,2}):(\d{2})$/);
+    const match = dateVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(\d{1,2}):(\d{2})$/);
     if (match) {
         let [, day, month, year, hours, minutes] = match;
         year = parseInt(year);
         if (year < 100) year += 2000;
         return new Date(year, parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
     }
+
     // Fallback: try native parsing
-    const d = new Date(dateStr);
+    const d = new Date(dateVal);
     return isNaN(d.getTime()) ? null : d;
 }
 

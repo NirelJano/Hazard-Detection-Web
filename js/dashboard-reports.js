@@ -4,7 +4,7 @@
 
 import { db } from '../firebase-config.js';
 import { updateMapMarkers, flyToReport } from './dashboard-map.js';
-import { applyFilters, updateFilterBadge } from './dashboard-filters.js';
+import { applyFilters, updateFilterBadge, parseReportDate } from './dashboard-filters.js';
 import {
     doc,
     writeBatch,
@@ -324,8 +324,10 @@ function sortReportsArray(reports, column, direction) {
             valA = Number(valA) || 0;
             valB = Number(valB) || 0;
         } else if (column === 'date') {
-            valA = valA?.toDate ? valA.toDate().getTime() : new Date(valA).getTime();
-            valB = valB?.toDate ? valB.toDate().getTime() : new Date(valB).getTime();
+            const dateA = parseReportDate(valA);
+            const dateB = parseReportDate(valB);
+            valA = dateA ? dateA.getTime() : 0;
+            valB = dateB ? dateB.getTime() : 0;
         } else {
             if (column === 'location') {
                 valA = a.address || '';
