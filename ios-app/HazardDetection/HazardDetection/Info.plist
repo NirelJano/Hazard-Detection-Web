@@ -17,15 +17,15 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>CloudinaryCloudName</key>
-	<string>CLOUDINARY_CLOUD_NAME_REMOVED</string>
+	<string>$(CLOUDINARY_CLOUD_NAME)</string>
 	<key>CloudinaryUploadPreset</key>
-	<string>CLOUDINARY_PRESET_REMOVED</string>
+	<string>$(CLOUDINARY_UPLOAD_PRESET)</string>
 	<key>FirebaseAPIKey</key>
-	<string>FIREBASE_API_KEY_REMOVED</string>
+	<string>$(FIREBASE_API_KEY)</string>
 	<key>FirebaseProjectID</key>
-	<string>hazard-detection-web</string>
+	<string>$(FIREBASE_PROJECT_ID)</string>
 	<key>MapboxAccessToken</key>
-	<string>MAPBOX_TOKEN_REMOVED</string>
+	<string>$(MAPBOX_ACCESS_TOKEN)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app uses the camera to detect road hazards in real time.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

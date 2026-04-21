@@ -38,6 +38,7 @@
 		BAD4E70F90AE4A9EB71862AB /* static_detection.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = static_detection.png; sourceTree = "<group>"; };
 		D03AD3B2BE8E40E786DED35A /* report_table.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = report_table.png; sourceTree = "<group>"; };
 		FC9CF6D369CA4738B565ABB4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		CAFE5EC4E75C0BAFE5EC4E7C /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,6 +58,7 @@
 			children = (
 				D8EA60AEE48D415D97AF9E80 /* HazardDetection */,
 				CC15B2D8B0F04EDB8839F186 /* Products */,
+				CAFE5EC4E75C0BAFE5EC4E7C /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -176,6 +178,7 @@
 /* Begin XCBuildConfiguration section */
 		80EB088E7C8F4C79A5A3692C /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CAFE5EC4E75C0BAFE5EC4E7C /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSET_CATALOG_COMPILER_OPTIMIZATION = space;
@@ -201,6 +204,7 @@
 		};
 		8E894C4AA5414D2FB8CF6571 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = CAFE5EC4E75C0BAFE5EC4E7C /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSET_CATALOG_COMPILER_OPTIMIZATION = space;

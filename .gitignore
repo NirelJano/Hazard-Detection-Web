@@ -43,3 +43,6 @@ venv*/
 # Admin Tools
 admin-tools/serviceAccountKey.json
 admin-tools/node_modules/
+
+# iOS secrets
+ios-app/HazardDetection/Secrets.xcconfig
