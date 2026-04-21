@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>HazardDetection</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CloudinaryCloudName</key>
+	<string>CLOUDINARY_CLOUD_NAME_REMOVED</string>
+	<key>CloudinaryUploadPreset</key>
+	<string>CLOUDINARY_PRESET_REMOVED</string>
+	<key>FirebaseAPIKey</key>
+	<string>FIREBASE_API_KEY_REMOVED</string>
+	<key>FirebaseProjectID</key>
+	<string>hazard-detection-web</string>
+	<key>MapboxAccessToken</key>
+	<string>MAPBOX_TOKEN_REMOVED</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to detect road hazards in real time.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app attaches GPS coordinates to hazard reports.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app lets you select hazard photos for manual reports.</string>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+</dict>
+</plist>

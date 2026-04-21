@@ -1,0 +1,37 @@
+name: HazardDetection
+options:
+  bundleIdPrefix: com.hazarddetection
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+
+targets:
+  HazardDetection:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: HazardDetection
+    info:
+      path: HazardDetection/Info.plist
+      properties:
+        CFBundleDisplayName: HazardDetection
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        NSCameraUsageDescription: "This app uses the camera to detect road hazards in real time."
+        NSLocationWhenInUseUsageDescription: "This app attaches GPS coordinates to hazard reports."
+        NSPhotoLibraryUsageDescription: "This app lets you select hazard photos for manual reports."
+        FirebaseAPIKey: ""
+        FirebaseProjectID: ""
+        CloudinaryCloudName: ""
+        CloudinaryUploadPreset: ""
+        MapboxAccessToken: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.hazarddetection.app
+      SWIFT_VERSION: "5.9"
+      IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+      DEVELOPMENT_TEAM: ""

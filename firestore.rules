@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.type == 'admin';
+    }
+
+    // users/{uid}: own doc access; admins can read all; no self-promotion to admin
+    match /users/{uid} {
+      allow read: if request.auth.uid == uid || isAdmin();
+      allow create: if request.auth.uid == uid;
+      allow update: if request.auth.uid == uid &&
+        !('type' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if isAdmin();
+    }
+
+    // reports/{reportId}: any authenticated user can read/create; only admins can update/delete
+    match /reports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    // metadata/reportCounter: used for sequential report ID generation
+    match /metadata/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
