@@ -5,6 +5,11 @@ options:
     iOS: "17.0"
   xcodeVersion: "15.0"
 
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 12.12.1
+
 targets:
   HazardDetection:
     type: application
@@ -12,6 +17,9 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: HazardDetection
+        excludes:
+          - best.mlpackage/**
+          - best.mlmodelc/**
     info:
       path: HazardDetection/Info.plist
       properties:
@@ -23,15 +31,23 @@ targets:
         NSCameraUsageDescription: "This app uses the camera to detect road hazards in real time."
         NSLocationWhenInUseUsageDescription: "This app attaches GPS coordinates to hazard reports."
         NSPhotoLibraryUsageDescription: "This app lets you select hazard photos for manual reports."
-        FirebaseAPIKey: ""
-        FirebaseProjectID: ""
-        CloudinaryCloudName: ""
-        CloudinaryUploadPreset: ""
-        MapboxAccessToken: ""
+        FirebaseAPIKey: "$(FIREBASE_API_KEY)"
+        FirebaseProjectID: "$(FIREBASE_PROJECT_ID)"
+        CloudinaryCloudName: "$(CLOUDINARY_CLOUD_NAME)"
+        CloudinaryUploadPreset: "$(CLOUDINARY_UPLOAD_PRESET)"
+        MapboxAccessToken: "$(MAPBOX_ACCESS_TOKEN)"
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.hazarddetection.app
       SWIFT_VERSION: "5.9"
       IPHONEOS_DEPLOYMENT_TARGET: "17.0"
-      DEVELOPMENT_TEAM: ""
+      DEVELOPMENT_TEAM: "8NX9TVG3J6"
+      ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"

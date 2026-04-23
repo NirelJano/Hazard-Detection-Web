@@ -1,9 +1,18 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var app = AppController()
+    
     var body: some View {
-        HomeView()
-            .preferredColorScheme(.dark)
+        Group {
+            if app.currentUser == nil {
+                AuthenticationView()
+            } else {
+                MainTabView()
+            }
+        }
+        .environmentObject(app)
+        .preferredColorScheme(.dark)
     }
 }
 

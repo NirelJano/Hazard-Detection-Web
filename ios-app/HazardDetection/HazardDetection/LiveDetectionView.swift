@@ -5,8 +5,8 @@ import AVFoundation
 struct LiveDetectionView: View {
     @ObservedObject var cameraManager: CameraManager
     @EnvironmentObject private var app: AppController
-    @Environment(\.dismiss) var dismiss
     @State private var tracker = DetectionTracker()
+    @State private var isDetecting = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -14,24 +14,34 @@ struct LiveDetectionView: View {
             CameraView(cameraManager: cameraManager)
                 .ignoresSafeArea()
 
-            // Close button
             VStack {
-                HStack {
-                    Button(action: {
-                        cameraManager.stopSession()
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(.white.opacity(0.6))
-                            .padding()
-                    }
-                    Spacer()
-                }
                 Spacer()
+                
+                // HUD
+                EnhancedHUDView(
+                    isDetecting: isDetecting,
+                    hazardCount: cameraManager.detectedHazards.count,
+                    message: app.liveMessage,
+                    location: app.locationService.currentCoordinate != nil ? "GPS Active" : "Searching GPS..."
+                )
+                
+                // Controls
+                HStack(spacing: 24) {
+                    Button(action: {
+                        toggleDetection()
+                    }) {
+                        Text(isDetecting ? "Stop Detection" : "Start Detection")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 24)
+                            .background(isDetecting ? Color.appDanger : Color.appSuccess)
+                            .clipShape(Capsule())
+                            .shadow(radius: 4)
+                    }
+                }
+                .padding(.bottom, 24)
             }
-
-            HUDView(hazardCount: cameraManager.detectedHazards.count, message: app.liveMessage)
         }
         .onAppear  {
             app.locationService.requestPermission()
@@ -49,14 +59,24 @@ struct LiveDetectionView: View {
             }
         }
         .onReceive(cameraManager.$detectedHazards) { hazards in
-            handle(hazards)
+            if isDetecting {
+                handle(hazards)
+            }
         }
         .onDisappear {
+            isDetecting = false
             cameraManager.stopSession()
         }
         .preferredColorScheme(.dark)
-        .statusBarHidden(true)
-        .navigationBarHidden(true)
+    }
+
+    private func toggleDetection() {
+        isDetecting.toggle()
+        if isDetecting {
+            app.liveMessage = "Detection started."
+        } else {
+            app.liveMessage = "Detection stopped."
+        }
     }
 
     private func handle(_ hazards: [VNRecognizedObjectObservation]) {
@@ -76,30 +96,52 @@ struct LiveDetectionView: View {
 
 // MARK: - HUD
 
-private struct HUDView: View {
+private struct EnhancedHUDView: View {
+    let isDetecting: Bool
     let hazardCount: Int
     let message: String?
+    let location: String
 
-    private var statusColor: Color { hazardCount == 0 ? .appSuccess : .appDanger }
+    private var statusColor: Color { 
+        if !isDetecting { return .appDark400 }
+        return hazardCount == 0 ? .appSuccess : .appDanger 
+    }
 
     private var statusText: String {
-        hazardCount == 0
-            ? "No Hazards Detected"
-            : "\(hazardCount) Hazard\(hazardCount > 1 ? "s" : "") Detected"
+        if !isDetecting { return "Standby" }
+        return hazardCount == 0
+            ? "No Hazards"
+            : "\(hazardCount) Hazard\(hazardCount > 1 ? "s" : "")"
     }
 
     var body: some View {
         VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 10, height: 10)
-                    .shadow(color: statusColor.opacity(0.8), radius: 6)
-                    .animation(.easeInOut(duration: 0.3), value: hazardCount)
+            HStack(spacing: 16) {
+                // Status Indicator
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                        .shadow(color: statusColor.opacity(0.8), radius: 4)
 
-                Text(statusText)
-                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.white)
+                    Text(statusText)
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white)
+                }
+                
+                Divider()
+                    .frame(height: 12)
+                    .background(Color.white.opacity(0.3))
+                
+                // Location Indicator
+                HStack(spacing: 4) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(location == "GPS Active" ? .appPrimary : .appWarning)
+                    Text(location)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                }
             }
 
             if let message, !message.isEmpty {
@@ -113,8 +155,8 @@ private struct HUDView: View {
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(statusColor.opacity(0.6), lineWidth: 1))
-        .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
-        .padding(.bottom, 48)
+        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+        .padding(.bottom, 16)
     }
 }
