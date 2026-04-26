@@ -1,0 +1,40 @@
+// Config.xcconfig
+// Configuration file for Firebase, Cloudinary, and Mapbox
+// 
+// IMPORTANT: Add this file to .gitignore to keep your secrets safe!
+//
+// To use this file:
+// 1. Replace the placeholder values below with your actual API keys
+// 2. In Xcode: Project Settings → Info → Configurations
+// 3. Set this file for both Debug and Release configurations
+
+// ========================================
+// FIREBASE CONFIGURATION (Optional)
+// ========================================
+// Get this from your GoogleService-Info.plist file
+// OR just include GoogleService-Info.plist in your project
+FIREBASE_API_KEY = YOUR_FIREBASE_API_KEY_HERE
+
+// ========================================
+// CLOUDINARY CONFIGURATION (Required)
+// ========================================
+// 1. Sign up at https://cloudinary.com/
+// 2. Find your Cloud Name in the dashboard
+// 3. Create an UNSIGNED upload preset in Settings → Upload
+CLOUDINARY_CLOUD_NAME = YOUR_CLOUD_NAME_HERE
+CLOUDINARY_UPLOAD_PRESET = YOUR_UPLOAD_PRESET_HERE
+
+// ========================================
+// MAPBOX CONFIGURATION (Required)
+// ========================================
+// 1. Sign up at https://www.mapbox.com/
+// 2. Create a token with 'geocoding:read' scope
+// 3. Token should start with 'pk.'
+MAPBOX_ACCESS_TOKEN = YOUR_MAPBOX_TOKEN_HERE
+
+// ========================================
+// EXAMPLE VALUES (DO NOT USE IN PRODUCTION)
+// ========================================
+// CLOUDINARY_CLOUD_NAME = dxyz123abc
+// CLOUDINARY_UPLOAD_PRESET = hazard_detection_unsigned
+// MAPBOX_ACCESS_TOKEN = pk.eyJ1IjoieW91cnVzZXJuYW1lIiwiYSI6ImNrNzg5...

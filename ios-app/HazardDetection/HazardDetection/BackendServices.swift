@@ -59,14 +59,7 @@ final class ReportRepository: ObservableObject {
                     }
 
                     let documents = snapshot?.documents ?? []
-                    self.reports = documents.compactMap { document in
-                        do {
-                            return try document.data(as: HazardReport.self)
-                        } catch {
-                            print("Decode error: \(error)")
-                            return nil
-                        }
-                    }
+                    self.reports = documents.compactMap { HazardReport(document: $0) }
                     print("Firestore reports listener updated: \(self.reports.count) reports.")
                 }
             }
@@ -86,7 +79,51 @@ final class ReportRepository: ObservableObject {
         lng: Double,
         image: UIImage?,
         userProfile: AppUserProfile?,
-        userId: String
+        userId: String,
+        detectionLabel: String? = nil,
+        detectionConfidence: Double? = nil,
+        detectionSource: String? = nil,
+        detectionBoundingBox: DetectionBoundingBox? = nil
+    ) async throws {
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        var address: String? = nil
+        do {
+            address = try await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
+        } catch {
+            print("Geocoding failed: \(error)")
+        }
+
+        try await addReport(
+            type: type,
+            description: description,
+            lat: lat,
+            lng: lng,
+            address: address,
+            image: image,
+            userProfile: userProfile,
+            userId: userId,
+            createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
+            detectionLabel: detectionLabel,
+            detectionConfidence: detectionConfidence,
+            detectionSource: detectionSource,
+            detectionBoundingBox: detectionBoundingBox
+        )
+    }
+
+    func addReport(
+        type: String,
+        description: String?,
+        lat: Double,
+        lng: Double,
+        address: String?,
+        image: UIImage?,
+        userProfile: AppUserProfile?,
+        userId: String,
+        createdAtMillis: Int64,
+        detectionLabel: String? = nil,
+        detectionConfidence: Double? = nil,
+        detectionSource: String? = nil,
+        detectionBoundingBox: DetectionBoundingBox? = nil
     ) async throws {
         guard Auth.auth().currentUser?.uid == userId else {
             throw AppBackendError.unauthenticated
@@ -101,18 +138,10 @@ final class ReportRepository: ObservableObject {
             if let image {
                 imageUrl = try await CloudinaryService.shared.uploadImage(image)
             }
-            
-            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-            var address: String? = nil
-            do {
-                address = try await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
-            } catch {
-                print("Geocoding failed: \(error)")
-            }
 
             let formatter = DateFormatter()
             formatter.dateFormat = "dd/MM/yy HH:mm"
-            let dateString = formatter.string(from: Date())
+            let dateString = formatter.string(from: Date(timeIntervalSince1970: TimeInterval(createdAtMillis) / 1000))
             let reportedBy = userProfile?.displayName ?? userProfile?.email ?? "User"
 
             let reportRef = db.collection("reports").document()
@@ -131,27 +160,25 @@ final class ReportRepository: ObservableObject {
                 let newCount = oldCount + 1
                 
                 transaction.setData(["count": newCount], forDocument: counterRef, merge: true)
-                
-                let report = HazardReport(
-                    docId: reportRef.documentID,
-                    numericId: newCount,
-                    hazardType: type,
-                    date: dateString,
-                    description: description,
-                    coordinate: GeoPoint(latitude: lat, longitude: lng),
-                    address: address,
-                    imageUrl: imageUrl,
-                    status: "new",
-                    reportedBy: reportedBy,
-                    createdAt: nil
-                )
-                
-                do {
-                    try transaction.setData(from: report, forDocument: reportRef)
-                } catch let encodeError as NSError {
-                    errorPointer?.pointee = encodeError
-                    return nil
-                }
+
+                var data: [String: Any] = [
+                    "id": newCount,
+                    "hazardType": type,
+                    "date": dateString,
+                    "createdAt": createdAtMillis,
+                    "coordinate": GeoPoint(latitude: lat, longitude: lng),
+                    "address": address ?? "",
+                    "imageUrl": imageUrl ?? "",
+                    "reportedBy": reportedBy,
+                    "status": "new"
+                ]
+                if let description { data["description"] = description }
+                if let detectionLabel { data["detectedLabel"] = detectionLabel }
+                if let detectionConfidence { data["detectionConfidence"] = detectionConfidence }
+                if let detectionSource { data["detectionSource"] = detectionSource }
+                if let detectionBoundingBox { data["detectionBoundingBox"] = detectionBoundingBox.dictionary }
+
+                transaction.setData(data, forDocument: reportRef)
                 
                 return newCount
             })
@@ -233,7 +260,11 @@ final class AppController: ObservableObject {
         reportRepository.fetchReports()
     }
 
-    func createManualReport(image: UIImage?, hazardType: String) {
+    func createManualReport(
+        image: UIImage?,
+        hazardType: String,
+        detection: DetectionCandidate? = nil
+    ) {
         guard let userId = authManager.user?.uid else {
             uploadMessage = AppBackendError.unauthenticated.localizedDescription
             return
@@ -254,7 +285,11 @@ final class AppController: ObservableObject {
                     lng: coordinate.longitude,
                     image: image,
                     userProfile: userProfile,
-                    userId: userId
+                    userId: userId,
+                    detectionLabel: detection?.label,
+                    detectionConfidence: detection.map { Double($0.confidence) },
+                    detectionSource: detection != nil ? "manual_image" : nil,
+                    detectionBoundingBox: detection.map { DetectionBoundingBox(from: $0.boundingBox) }
                 )
                 uploadMessage = "Report saved."
             } catch {
@@ -264,38 +299,98 @@ final class AppController: ObservableObject {
         }
     }
 
-    func submitLiveReport(label: String, boundingBox: CGRect, image: UIImage?) {
+    func createUploadedReport(
+        image: UIImage,
+        hazardType: String,
+        coordinate: CLLocationCoordinate2D,
+        address: String,
+        detections: [DetectionCandidate]
+    ) {
+        guard let userId = authManager.user?.uid else {
+            uploadMessage = AppBackendError.unauthenticated.localizedDescription
+            return
+        }
+        guard !detections.isEmpty else {
+            uploadMessage = "Cannot save: missing detection data"
+            return
+        }
+
+        isUploadingReport = true
+        uploadMessage = nil
+        Task {
+            do {
+                try await reportRepository.addReport(
+                    type: hazardType,
+                    description: nil,
+                    lat: coordinate.latitude,
+                    lng: coordinate.longitude,
+                    address: address,
+                    image: image,
+                    userProfile: userProfile,
+                    userId: userId,
+                    createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
+                    detectionLabel: hazardType,
+                    detectionConfidence: detections.map(\.confidence).max().map(Double.init),
+                    detectionSource: "manual_image",
+                    detectionBoundingBox: detections.first.map { DetectionBoundingBox(from: $0.boundingBox) }
+                )
+                uploadMessage = "Report saved."
+            } catch {
+                uploadMessage = error.localizedDescription
+            }
+            isUploadingReport = false
+        }
+    }
+
+    func submitLiveReport(_ trigger: LiveReportTrigger) {
         guard let userId = authManager.user?.uid else {
             liveMessage = AppBackendError.unauthenticated.localizedDescription
             return
         }
-        guard shouldSaveLiveReport(label: label) else { return }
-        guard let coordinate = locationService.currentCoordinate else {
+        guard shouldSaveLiveReport(label: trigger.label) else { return }
+        guard let location = locationService.currentLocation else {
             liveMessage = AppBackendError.missingLocation.localizedDescription
             return
         }
-        guard !hasNearbyDuplicate(label: label, latitude: coordinate.latitude, longitude: coordinate.longitude) else {
-            liveMessage = "Skipped duplicate \(label)."
+        guard !hasNearbyDuplicate(
+            label: trigger.label,
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude
+        ) else {
+            liveMessage = "Skipped duplicate \(trigger.label)."
             return
         }
 
-        let annotated = image.map { ImageAnnotator.drawBoundingBox(on: $0, label: label, box: boundingBox) }
-        liveMessage = "Saving \(label)..."
-        recentlySavedLabels[label] = Date()
+        let coordinate = location.coordinate
+        liveMessage = "Resolving \(trigger.label) location..."
+        recentlySavedLabels[trigger.label] = Date()
 
         Task {
             do {
+                let address = try await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
+                let annotated = ImageAnnotator.drawBoundingBoxes(
+                    on: trigger.image,
+                    detections: [trigger.candidate]
+                )
+                liveMessage = "Saving \(trigger.label)..."
                 try await reportRepository.addReport(
-                    type: label,
+                    type: trigger.label,
                     description: "Live detection",
                     lat: coordinate.latitude,
                     lng: coordinate.longitude,
+                    address: address,
                     image: annotated,
                     userProfile: userProfile,
-                    userId: userId
+                    userId: userId,
+                    createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
+                    detectionLabel: trigger.label,
+                    detectionConfidence: Double(trigger.confidence),
+                    detectionSource: "live_camera",
+                    detectionBoundingBox: DetectionBoundingBox(from: trigger.boundingBox)
                 )
-                liveMessage = "Saved \(label) report."
+                liveMessage = "Saved \(trigger.label) report."
             } catch {
+                recentlySavedLabels.removeValue(forKey: trigger.label)
                 liveMessage = error.localizedDescription
             }
         }
@@ -353,58 +448,178 @@ final class AppController: ObservableObject {
 
     private func hasNearbyDuplicate(label: String, latitude: Double, longitude: Double) -> Bool {
         let current = CLLocation(latitude: latitude, longitude: longitude)
-        return reports.contains { report in
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let recent = reports
+            .filter { $0.hazardType == label }
+            .sorted { ($0.createdAt ?? 0) > ($1.createdAt ?? 0) }
+            .prefix(10)
+
+        return recent.contains { report in
             guard report.hazardType == label else { return false }
+            guard let createdAt = report.createdAt, now - createdAt < 30_000 else { return false }
             let reportLocation = CLLocation(latitude: report.coordinate.latitude, longitude: report.coordinate.longitude)
             return current.distance(from: reportLocation) < 5
         }
     }
 }
 
+enum TrackState: String {
+    case tentative
+    case confirmed
+    case vanished
+    case reported
+    case deleted
+}
+
+struct TrackedOverlay: Identifiable, Equatable {
+    let id: Int
+    var label: String
+    var state: TrackState
+    var age: Int
+    var currentBoundingBox: CGRect
+    var targetBoundingBox: CGRect
+    var confidence: Float
+
+    var displayLabel: String {
+        state == .confirmed ? label : "\(label) (?)"
+    }
+
+    var color: Color {
+        switch state {
+        case .tentative: return .yellow
+        case .confirmed: return .appSuccess
+        case .vanished: return .appDanger
+        case .reported, .deleted: return .appDark400
+        }
+    }
+}
+
+struct LiveReportTrigger {
+    let candidate: DetectionCandidate
+    let image: UIImage
+
+    var label: String { candidate.label }
+    var confidence: Float { candidate.confidence }
+    var boundingBox: CGRect { candidate.boundingBox }
+}
+
 struct DetectionTracker {
     private var active: [TrackedDetection] = []
     private var nextID = 1
-    private let maxAge = 3
+    private let maxAge = 15
+    private let minHits = 1
     private let iouThreshold: CGFloat = 0.30
 
-    mutating func update(with detections: [DetectionCandidate]) -> DetectionCandidate? {
-        var matchedIDs = Set<Int>()
-        var report: DetectionCandidate?
+    mutating func reset() {
+        active = []
+        nextID = 1
+    }
 
-        for detection in detections {
-            if let index = bestMatch(for: detection, matchedIDs: matchedIDs) {
+    mutating func update(
+        with detections: [DetectionCandidate],
+        frame: UIImage?,
+        speed: CLLocationSpeed
+    ) -> (overlays: [TrackedOverlay], reports: [LiveReportTrigger]) {
+        let confidenceThreshold: Float = speed > 13.8 ? 0.30 : 0.40
+        let filtered = detections.filter { $0.confidence >= confidenceThreshold }
+
+        for index in active.indices where active[index].state != .reported {
+            active[index].age += 1
+        }
+
+        var matchedDetections = Set<Int>()
+
+        for index in active.indices {
+            guard active[index].state != .reported else { continue }
+            var bestIoU: CGFloat = 0
+            var bestDetectionIndex: Int?
+
+            for detectionIndex in filtered.indices where !matchedDetections.contains(detectionIndex) {
+                let detection = filtered[detectionIndex]
+                guard detection.label == active[index].label else { continue }
+                let iou = active[index].candidate.boundingBox.iou(with: detection.boundingBox)
+                if iou > bestIoU, iou > iouThreshold {
+                    bestIoU = iou
+                    bestDetectionIndex = detectionIndex
+                }
+            }
+
+            if let bestDetectionIndex {
+                let detection = filtered[bestDetectionIndex]
+                active[index].velocity = CGVector(
+                    dx: detection.boundingBox.minX - active[index].candidate.boundingBox.minX,
+                    dy: detection.boundingBox.minY - active[index].candidate.boundingBox.minY
+                )
                 active[index].candidate = detection
                 active[index].age = 0
                 active[index].hits += 1
-                matchedIDs.insert(active[index].id)
-            } else {
-                active.append(TrackedDetection(id: nextID, candidate: detection, hits: 1, age: 0))
-                matchedIDs.insert(nextID)
-                nextID += 1
+
+                if active[index].state == .tentative, active[index].hits >= minHits {
+                    active[index].state = .confirmed
+                } else if active[index].state == .vanished {
+                    active[index].state = .confirmed
+                }
+
+                if let frame {
+                    active[index].appendFrame(image: frame, candidate: detection)
+                }
+                matchedDetections.insert(bestDetectionIndex)
+            } else if active[index].state == .confirmed {
+                active[index].state = .vanished
             }
         }
+
+        for detectionIndex in filtered.indices where !matchedDetections.contains(detectionIndex) {
+            let detection = filtered[detectionIndex]
+            var track = TrackedDetection(
+                id: nextID,
+                candidate: detection,
+                hits: 1,
+                age: 0,
+                state: .tentative
+            )
+            if let frame {
+                track.appendFrame(image: frame, candidate: detection)
+            }
+            active.append(track)
+            nextID += 1
+        }
+
+        var reports: [LiveReportTrigger] = []
 
         for index in active.indices {
-            if !matchedIDs.contains(active[index].id) {
-                active[index].age += 1
+            if active[index].state == .vanished, active[index].age > maxAge {
+                if let frame = active[index].bestFrame, active[index].isInReportZone(imageSize: frame.image.size) {
+                    active[index].state = .reported
+                    reports.append(LiveReportTrigger(candidate: frame.candidate, image: frame.image))
+                } else {
+                    active[index].state = .deleted
+                }
+            } else if active[index].state == .tentative, active[index].age > 2 {
+                active[index].state = .deleted
             }
         }
 
-        if let vanished = active.first(where: { $0.age >= maxAge && $0.hits >= 1 && $0.candidate.boundingBox.minY < 0.40 }) {
-            report = vanished.candidate
+        let overlays = active.compactMap { track -> TrackedOverlay? in
+            guard track.state != .deleted, track.state != .reported else { return nil }
+            var predicted = track.candidate.boundingBox
+            if track.age > 0 {
+                predicted.origin.x += track.velocity.dx * CGFloat(track.age)
+                predicted.origin.y += track.velocity.dy * CGFloat(track.age)
+            }
+            return TrackedOverlay(
+                id: track.id,
+                label: track.label,
+                state: track.state,
+                age: track.age,
+                currentBoundingBox: predicted,
+                targetBoundingBox: predicted,
+                confidence: track.candidate.confidence
+            )
         }
 
-        active.removeAll { $0.age >= maxAge }
-        return report
-    }
-
-    private func bestMatch(for detection: DetectionCandidate, matchedIDs: Set<Int>) -> Int? {
-        active.indices
-            .filter { active[$0].candidate.label == detection.label && !matchedIDs.contains(active[$0].id) }
-            .map { ($0, active[$0].candidate.boundingBox.iou(with: detection.boundingBox)) }
-            .filter { $0.1 >= iouThreshold }
-            .max { $0.1 < $1.1 }?
-            .0
+        active.removeAll { $0.state == .deleted || $0.state == .reported }
+        return (overlays, reports)
     }
 }
 
@@ -414,35 +629,132 @@ struct DetectionCandidate {
     let boundingBox: CGRect
 }
 
+private struct DetectionFrame {
+    let image: UIImage
+    let candidate: DetectionCandidate
+    let score: CGFloat
+}
+
 private struct TrackedDetection {
     let id: Int
     var candidate: DetectionCandidate
     var hits: Int
     var age: Int
+    var state: TrackState
+    var velocity: CGVector = .zero
+    var frameBuffer: [DetectionFrame] = []
+
+    var label: String { candidate.label }
+    var bestFrame: DetectionFrame? { frameBuffer.first }
+
+    mutating func appendFrame(image: UIImage, candidate: DetectionCandidate) {
+        let rect = DetectionGeometry.visionRectToImageRect(candidate.boundingBox, imageSize: image.size)
+        let frameScore = CGFloat(candidate.confidence) * rect.width * rect.height
+        frameBuffer.append(DetectionFrame(image: image, candidate: candidate, score: frameScore))
+        frameBuffer.sort { $0.score > $1.score }
+        if frameBuffer.count > 5 {
+            frameBuffer.removeLast(frameBuffer.count - 5)
+        }
+    }
+
+    func isInReportZone(imageSize: CGSize) -> Bool {
+        let rect = DetectionGeometry.visionRectToImageRect(candidate.boundingBox, imageSize: imageSize)
+        return rect.maxY > imageSize.height * 0.6
+    }
 }
 
 enum ImageAnnotator {
     static func drawBoundingBox(on image: UIImage, label: String, box: CGRect) -> UIImage {
+        drawBoundingBoxes(
+            on: image,
+            detections: [DetectionCandidate(label: label, confidence: 0, boundingBox: box)]
+        )
+    }
+
+    static func drawBoundingBoxes(on image: UIImage, detections: [DetectionCandidate]) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: image.size)
         return renderer.image { context in
             image.draw(in: CGRect(origin: .zero, size: image.size))
-            let rect = CGRect(
-                x: box.minX * image.size.width,
-                y: (1 - box.maxY) * image.size.height,
-                width: box.width * image.size.width,
-                height: box.height * image.size.height
-            )
-            UIColor.systemGreen.setStroke()
-            context.cgContext.setLineWidth(4)
-            context.cgContext.stroke(rect)
+            let scaleFactor = max(image.size.width / 600, 1)
+            for detection in detections {
+                let rect = DetectionGeometry.visionRectToImageRect(detection.boundingBox, imageSize: image.size)
+                UIColor.systemGreen.setStroke()
+                context.cgContext.setLineWidth(4 * scaleFactor)
+                context.cgContext.stroke(rect)
 
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 18),
-                .foregroundColor: UIColor.black,
-                .backgroundColor: UIColor.systemGreen
-            ]
-            label.draw(at: CGPoint(x: rect.minX, y: max(rect.minY - 24, 4)), withAttributes: attributes)
+                let fontSize = 16 * scaleFactor
+                let label = "\(detection.label) \(Int(detection.confidence * 100))%"
+                let font = UIFont.boldSystemFont(ofSize: fontSize)
+                let labelSize = (label as NSString).size(withAttributes: [.font: font])
+                let padX = 8 * scaleFactor
+                let padY = 6 * scaleFactor
+                let labelRect = CGRect(
+                    x: rect.minX,
+                    y: max(rect.minY - labelSize.height - padY * 2, 0),
+                    width: labelSize.width + padX * 2,
+                    height: labelSize.height + padY * 2
+                )
+
+                UIColor.systemGreen.setFill()
+                context.cgContext.fill(labelRect)
+                (label as NSString).draw(
+                    at: CGPoint(x: labelRect.minX + padX, y: labelRect.minY + padY),
+                    withAttributes: [
+                        .font: font,
+                        .foregroundColor: UIColor.white
+                    ]
+                )
+            }
         }
+    }
+}
+
+enum DetectionGeometry {
+    static func visionRectToImageRect(_ rect: CGRect, imageSize: CGSize) -> CGRect {
+        CGRect(
+            x: rect.minX * imageSize.width,
+            y: (1 - rect.maxY) * imageSize.height,
+            width: rect.width * imageSize.width,
+            height: rect.height * imageSize.height
+        )
+    }
+
+    static func visionRectToAspectFillRect(
+        _ rect: CGRect,
+        imageSize: CGSize,
+        containerSize: CGSize
+    ) -> CGRect {
+        let imageRect = visionRectToImageRect(rect, imageSize: imageSize)
+        let scale = max(containerSize.width / imageSize.width, containerSize.height / imageSize.height)
+        let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        let xOffset = (scaledSize.width - containerSize.width) / 2
+        let yOffset = (scaledSize.height - containerSize.height) / 2
+
+        return CGRect(
+            x: imageRect.minX * scale - xOffset,
+            y: imageRect.minY * scale - yOffset,
+            width: imageRect.width * scale,
+            height: imageRect.height * scale
+        )
+    }
+
+    static func visionRectToAspectFitRect(
+        _ rect: CGRect,
+        imageSize: CGSize,
+        containerSize: CGSize
+    ) -> CGRect {
+        let imageRect = visionRectToImageRect(rect, imageSize: imageSize)
+        let scale = min(containerSize.width / imageSize.width, containerSize.height / imageSize.height)
+        let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        let xInset = (containerSize.width - scaledSize.width) / 2
+        let yInset = (containerSize.height - scaledSize.height) / 2
+
+        return CGRect(
+            x: imageRect.minX * scale + xInset,
+            y: imageRect.minY * scale + yInset,
+            width: imageRect.width * scale,
+            height: imageRect.height * scale
+        )
     }
 }
 

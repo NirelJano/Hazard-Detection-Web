@@ -1,0 +1,51 @@
+<!-- 
+  COPY AND PASTE THIS INTO YOUR EXISTING Info.plist
+  
+  Instructions:
+  1. Open your existing Info.plist in Xcode
+  2. Right-click → Open As → Source Code
+  3. Find the </dict> tag near the bottom
+  4. Paste the content below BEFORE the </dict> tag
+  5. Save the file
+-->
+
+<!-- Cloudinary Configuration -->
+<key>CloudinaryCloudName</key>
+<string>dhw2qum65</string>
+
+<key>CloudinaryUploadPreset</key>
+<string>Road_Hazard_Detection_WEB</string>
+
+<!-- Mapbox Configuration -->
+<key>MapboxAccessToken</key>
+<string>YOUR_MAPBOX_PUBLIC_TOKEN</string>
+
+<!-- Interface Orientations (fixes orientation warning) -->
+<key>UISupportedInterfaceOrientations</key>
+<array>
+	<string>UIInterfaceOrientationPortrait</string>
+	<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	<string>UIInterfaceOrientationLandscapeLeft</string>
+	<string>UIInterfaceOrientationLandscapeRight</string>
+</array>
+
+<key>UISupportedInterfaceOrientations~ipad</key>
+<array>
+	<string>UIInterfaceOrientationPortrait</string>
+	<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	<string>UIInterfaceOrientationLandscapeLeft</string>
+	<string>UIInterfaceOrientationLandscapeRight</string>
+</array>
+
+<!-- Privacy Descriptions (add these if not already present) -->
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>We need your location to report hazards and show nearby incidents.</string>
+
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>We need your location to report hazards and show nearby incidents.</string>
+
+<key>NSCameraUsageDescription</key>
+<string>We need access to your camera to take photos of hazards.</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>We need access to your photo library to select images for hazard reports.</string>

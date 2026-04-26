@@ -8,6 +8,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+        
+        #if DEBUG
+        // Print configuration diagnostics in debug builds
+        ConfigurationDiagnostics.debugPrintStatus()
+        #endif
+        
         return true
     }
 }

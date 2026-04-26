@@ -17,9 +17,6 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: HazardDetection
-        excludes:
-          - best.mlpackage/**
-          - best.mlmodelc/**
     info:
       path: HazardDetection/Info.plist
       properties:
@@ -46,7 +43,7 @@ targets:
       - package: Firebase
         product: FirebaseFirestore
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.hazarddetection.app
+      PRODUCT_BUNDLE_IDENTIFIER: com.raz0125.hazarddetection.app
       SWIFT_VERSION: "5.9"
       IPHONEOS_DEPLOYMENT_TARGET: "17.0"
       DEVELOPMENT_TEAM: "8NX9TVG3J6"

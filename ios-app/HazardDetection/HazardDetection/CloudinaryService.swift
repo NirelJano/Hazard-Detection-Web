@@ -28,8 +28,17 @@ actor CloudinaryService {
         self.uploadPreset = Bundle.main.object(forInfoDictionaryKey: "CloudinaryUploadPreset") as? String
     }
     
+    var isConfigured: Bool {
+        guard let cloudName, let uploadPreset,
+              !cloudName.isEmpty, !uploadPreset.isEmpty,
+              !cloudName.contains("$("), !uploadPreset.contains("$(") else {
+            return false
+        }
+        return true
+    }
+    
     func uploadImage(_ image: UIImage) async throws -> String {
-        guard let cloudName, let uploadPreset, !cloudName.isEmpty, !uploadPreset.isEmpty else {
+        guard isConfigured, let cloudName = cloudName, let uploadPreset = uploadPreset else {
             throw CloudinaryError.missingConfig
         }
         

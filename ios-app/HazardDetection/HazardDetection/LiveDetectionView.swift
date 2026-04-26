@@ -7,11 +7,13 @@ struct LiveDetectionView: View {
     @EnvironmentObject private var app: AppController
     @State private var tracker = DetectionTracker()
     @State private var isDetecting = false
+    @State private var overlays: [TrackedOverlay] = []
+    private let renderTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack(alignment: .bottom) {
             // Full-screen camera + bounding boxes
-            CameraView(cameraManager: cameraManager)
+            CameraView(cameraManager: cameraManager, overlays: overlays)
                 .ignoresSafeArea()
 
             VStack {
@@ -63,8 +65,14 @@ struct LiveDetectionView: View {
                 handle(hazards)
             }
         }
+        .onReceive(renderTimer) { _ in
+            guard isDetecting else { return }
+            smoothOverlayBoxes()
+        }
         .onDisappear {
             isDetecting = false
+            overlays = []
+            tracker.reset()
             cameraManager.stopSession()
         }
         .preferredColorScheme(.dark)
@@ -73,23 +81,53 @@ struct LiveDetectionView: View {
     private func toggleDetection() {
         isDetecting.toggle()
         if isDetecting {
-            app.liveMessage = "Detection started."
+            overlays = []
+            tracker.reset()
+            app.locationService.requestPermission()
+            cameraManager.startSession()
+            app.liveMessage = "Detecting..."
         } else {
-            app.liveMessage = "Detection stopped."
+            overlays = []
+            tracker.reset()
+            app.liveMessage = "Detection paused"
         }
     }
 
-    private func handle(_ hazards: [VNRecognizedObjectObservation]) {
-        let candidates = hazards.compactMap { observation -> DetectionCandidate? in
-            guard let label = observation.labels.first?.identifier else { return nil }
-            return DetectionCandidate(label: label, confidence: observation.confidence, boundingBox: observation.boundingBox)
+    private func handle(_ candidates: [DetectionCandidate]) {
+        let speed = max(app.locationService.currentLocation?.speed ?? 0, 0)
+        cameraManager.updateConfidenceThreshold(forSpeed: speed)
+        let result = tracker.update(
+            with: candidates,
+            frame: cameraManager.snapshotImage(),
+            speed: speed
+        )
+        mergeOverlays(result.overlays)
+        for report in result.reports {
+            app.submitLiveReport(report)
         }
-        if let report = tracker.update(with: candidates) {
-            app.submitLiveReport(
-                label: report.label,
-                boundingBox: report.boundingBox,
-                image: cameraManager.snapshotImage()
-            )
+    }
+
+    private func mergeOverlays(_ updated: [TrackedOverlay]) {
+        overlays = updated.map { incoming in
+            if let existing = overlays.first(where: { $0.id == incoming.id }) {
+                var merged = incoming
+                merged.currentBoundingBox = existing.currentBoundingBox
+                merged.targetBoundingBox = incoming.targetBoundingBox
+                return merged
+            }
+            return incoming
+        }
+    }
+
+    private func smoothOverlayBoxes() {
+        let alpha: CGFloat = 0.2
+        overlays = overlays.map { overlay in
+            var smoothed = overlay
+            smoothed.currentBoundingBox.origin.x += (overlay.targetBoundingBox.origin.x - overlay.currentBoundingBox.origin.x) * alpha
+            smoothed.currentBoundingBox.origin.y += (overlay.targetBoundingBox.origin.y - overlay.currentBoundingBox.origin.y) * alpha
+            smoothed.currentBoundingBox.size.width += (overlay.targetBoundingBox.size.width - overlay.currentBoundingBox.size.width) * alpha
+            smoothed.currentBoundingBox.size.height += (overlay.targetBoundingBox.size.height - overlay.currentBoundingBox.size.height) * alpha
+            return smoothed
         }
     }
 }

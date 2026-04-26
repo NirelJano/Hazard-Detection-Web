@@ -6,13 +6,27 @@ import Vision
 
 struct CameraView: View {
     @ObservedObject var cameraManager: CameraManager
+    var overlays: [TrackedOverlay]? = nil
 
     var body: some View {
         ZStack {
             CameraPreview(session: cameraManager.captureSession)
                 .ignoresSafeArea()
 
-            BoundingBoxOverlay(hazards: cameraManager.detectedHazards)
+            BoundingBoxOverlay(
+                overlays: overlays ?? cameraManager.detectedHazards.enumerated().map { index, hazard in
+                    TrackedOverlay(
+                        id: index,
+                        label: hazard.label,
+                        state: .confirmed,
+                        age: 0,
+                        currentBoundingBox: hazard.boundingBox,
+                        targetBoundingBox: hazard.boundingBox,
+                        confidence: hazard.confidence
+                    )
+                },
+                imageSize: cameraManager.latestFrameSize
+            )
                 .ignoresSafeArea()
         }
     }
@@ -48,30 +62,36 @@ final class PreviewUIView: UIView {
 // MARK: - Bounding Box Overlay
 
 struct BoundingBoxOverlay: View {
-    let hazards: [VNRecognizedObjectObservation]
+    let overlays: [TrackedOverlay]
+    let imageSize: CGSize?
 
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-            ForEach(Array(hazards.enumerated()), id: \.offset) { _, hazard in
-                let rect = visionRectToScreen(hazard.boundingBox, size: size)
-                let label = hazard.labels.first?.identifier ?? "Hazard"
+            ForEach(overlays) { hazard in
+                let sourceSize = imageSize ?? CGSize(width: 480, height: 640)
+                let rect = DetectionGeometry.visionRectToAspectFillRect(
+                    hazard.currentBoundingBox,
+                    imageSize: sourceSize,
+                    containerSize: size
+                )
+                let label = hazard.displayLabel
                 let pct   = String(format: "%.0f%%", hazard.confidence * 100)
+                let color = hazard.color
 
                 ZStack(alignment: .topLeading) {
-                    // Green bounding box
                     Rectangle()
-                        .stroke(Color.green, lineWidth: 2.5)
+                        .stroke(color, lineWidth: 2.5)
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
 
                     // Label badge above the box
                     Text("\(label) \(pct)")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.black)
+                        .foregroundColor(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.green)
+                        .background(color)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .position(
                             x: rect.minX + badgeWidth(label, pct) / 2,
@@ -80,16 +100,6 @@ struct BoundingBoxOverlay: View {
                 }
             }
         }
-    }
-
-    /// Converts Vision normalised rect (origin = bottom-left) to SwiftUI screen coords (origin = top-left)
-    private func visionRectToScreen(_ vRect: CGRect, size: CGSize) -> CGRect {
-        CGRect(
-            x:      vRect.minX * size.width,
-            y:      (1 - vRect.maxY) * size.height,
-            width:  vRect.width  * size.width,
-            height: vRect.height * size.height
-        )
     }
 
     private func badgeWidth(_ label: String, _ pct: String) -> CGFloat {

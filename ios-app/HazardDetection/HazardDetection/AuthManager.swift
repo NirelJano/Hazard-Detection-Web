@@ -43,7 +43,7 @@ final class AuthManager: ObservableObject {
             )
 
             do {
-                try await db.collection("users").document(result.user.uid).setData(from: profile)
+                try db.collection("users").document(result.user.uid).setData(from: profile)
             } catch {
                 let nsError = error as NSError
                 errorMessage = "Account created, but profile setup failed. \(error.localizedDescription)"

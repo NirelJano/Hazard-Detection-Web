@@ -313,7 +313,7 @@ def pbxproj():
 \t\t\trepositoryURL = "https://github.com/firebase/firebase-ios-sdk";
 \t\t\trequirement = {{
 \t\t\t\tkind = upToNextMajorVersion;
-\t\t\t\tminimumVersion = 10.0.0;
+\t\t\t\tminimumVersion = 12.12.1;
 \t\t\t}};
 \t\t}};
 /* End XCRemoteSwiftPackageReference section */

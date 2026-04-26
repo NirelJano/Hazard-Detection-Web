@@ -56,16 +56,45 @@ struct SettingsView: View {
                     .foregroundColor(.appDark400)
                     .padding(.top, 8)
                 
-                SettingRow(title: "Firebase", value: "Configured")
-                SettingRow(title: "Cloudinary", value: "Configured")
-                SettingRow(title: "Mapbox", value: "Configured")
-                SettingRow(title: "Location", value: locationText)
+                SettingRow(title: "🔥 Firebase", value: firebaseStatus)
+                SettingRow(title: "☁️ Cloudinary", value: cloudinaryStatus)
+                SettingRow(title: "🗺️ Mapbox", value: mapboxStatus)
+                SettingRow(title: "📍 Location", value: locationText)
             }
-            
+
             Button("Force Refresh Reports") { app.refreshReports() }
                 .foregroundColor(.appPrimary)
                 .padding(.top, 16)
         }
+    }
+
+    private var firebaseStatus: String {
+        // Check for GoogleService-Info.plist first
+        if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+            return "✅ Ready"
+        }
+        
+        let apiKey = Bundle.main.object(forInfoDictionaryKey: "FirebaseAPIKey") as? String
+        return isValidConfig(apiKey) ? "✅ Ready" : "❌ Not Configured"
+    }
+
+    private var cloudinaryStatus: String {
+        let cloudName = Bundle.main.object(forInfoDictionaryKey: "CloudinaryCloudName") as? String
+        let preset = Bundle.main.object(forInfoDictionaryKey: "CloudinaryUploadPreset") as? String
+        
+        return (isValidConfig(cloudName) && isValidConfig(preset)) ? "✅ Ready" : "❌ Not Configured"
+    }
+
+    private var mapboxStatus: String {
+        let token = Bundle.main.object(forInfoDictionaryKey: "MapboxAccessToken") as? String
+        let hasValidPrefix = token?.hasPrefix("pk.") ?? false || token?.hasPrefix("sk.") ?? false
+        
+        return (isValidConfig(token) && hasValidPrefix) ? "✅ Ready" : "❌ Not Configured"
+    }
+    
+    private func isValidConfig(_ value: String?) -> Bool {
+        guard let value = value, !value.isEmpty else { return false }
+        return !value.contains("$(") && !value.contains("YOUR_") && !value.contains("REPLACE_")
     }
 
     private var locationText: String {
