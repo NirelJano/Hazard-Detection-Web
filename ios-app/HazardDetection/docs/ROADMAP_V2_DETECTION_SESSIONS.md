@@ -52,9 +52,11 @@ The app should not treat every live detection as a final report immediately.
 
 ## M0 — Unified Report Pipeline
 
-**Status**: planned
+**Status**: shipped
 **Complexity**: M
 **Goal**: Manual upload and live detection use one report creation path.
+
+**Implementation note**: This milestone introduces `ReportDraft`, `ReportCreationService`, `ReportValidationPolicy`, `ReportPayloadBuilder`, and `ReportImagePreparer` under `HazardDetection/Reporting/`. Manual upload (`AppController.createUploadedReport`) and live detection (`AppController.submitLiveReport`) now both create a `ReportDraft` and submit through the same `ReportCreationService`. Existing Cloudinary upload and Firestore write behavior is unchanged.
 
 ### Problem
 
