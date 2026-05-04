@@ -105,6 +105,18 @@ IDs = {
     "bfReportPayloadBuilder":       uid(),
     "fileReportCreationService":    uid(),
     "bfReportCreationService":      uid(),
+    # Persistence module (M1)
+    "filePendingReport":            uid(),
+    "bfPendingReport":              uid(),
+    "fileHazardModelContainer":     uid(),
+    "bfHazardModelContainer":       uid(),
+    # Networking module (M1)
+    "fileBackgroundUploadCoord":    uid(),
+    "bfBackgroundUploadCoord":      uid(),
+    "fileReachabilityMonitor":      uid(),
+    "bfReachabilityMonitor":        uid(),
+    "fileRetryPolicy":              uid(),
+    "bfRetryPolicy":                uid(),
 }
 
 SWIFT_FILES = [
@@ -132,6 +144,13 @@ SWIFT_FILES = [
     ("Reporting/ReportImagePreparer.swift",     "fileReportImagePreparer",    "bfReportImagePreparer"),
     ("Reporting/ReportPayloadBuilder.swift",    "fileReportPayloadBuilder",   "bfReportPayloadBuilder"),
     ("Reporting/ReportCreationService.swift",   "fileReportCreationService",  "bfReportCreationService"),
+    # Persistence module (M1)
+    ("Persistence/PendingReport.swift",               "filePendingReport",         "bfPendingReport"),
+    ("Persistence/HazardModelContainer.swift",         "fileHazardModelContainer",  "bfHazardModelContainer"),
+    # Networking module (M1)
+    ("Networking/BackgroundUploadCoordinator.swift",   "fileBackgroundUploadCoord", "bfBackgroundUploadCoord"),
+    ("Networking/ReachabilityMonitor.swift",           "fileReachabilityMonitor",   "bfReachabilityMonitor"),
+    ("Networking/RetryPolicy.swift",                   "fileRetryPolicy",           "bfRetryPolicy"),
 ]
 
 PNG_FILES = [

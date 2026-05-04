@@ -1,6 +1,6 @@
 # M1 — Offline Reliability Foundation
 
-**Status**: planned
+**Status**: in-progress
 **Complexity**: L
 **Goal**: No report is ever lost; uploads survive backgrounding and network loss.
 

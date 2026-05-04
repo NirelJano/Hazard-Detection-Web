@@ -1,6 +1,6 @@
 import FirebaseCore
-import UIKit
 import SwiftUI
+import UIKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
@@ -8,12 +8,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
-        
+
         #if DEBUG
-        // Print configuration diagnostics in debug builds
         ConfigurationDiagnostics.debugPrintStatus()
         #endif
-        
+
         return true
     }
 }
@@ -25,6 +24,7 @@ struct HazardDetectionApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .modelContainer(HazardModelContainer.shared.container)
         }
     }
 }
