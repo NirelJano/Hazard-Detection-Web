@@ -11,6 +11,7 @@ final class AuthManager: ObservableObject {
     @Published private(set) var isLoading = false
 
     private var authStateHandle: AuthStateDidChangeListenerHandle?
+    private var profileListener: ListenerRegistration?
     private let db = Firestore.firestore()
 
     init() {
@@ -21,6 +22,7 @@ final class AuthManager: ObservableObject {
         if let authStateHandle {
             Auth.auth().removeStateDidChangeListener(authStateHandle)
         }
+        profileListener?.remove()
     }
 
     func register(email: String, password: String, displayName: String) async {
@@ -74,8 +76,8 @@ final class AuthManager: ObservableObject {
         do {
             let result = try await Auth.auth().signIn(withEmail: cleanEmail, password: password)
             user = result.user
-            await fetchUserProfile(uid: result.user.uid)
             isAuthenticated = true
+            installProfileListener(uid: result.user.uid)
             print("Firebase Auth signed in user: \(result.user.uid)")
         } catch {
             let nsError = error as NSError
@@ -88,6 +90,8 @@ final class AuthManager: ObservableObject {
     func logout() {
         do {
             try Auth.auth().signOut()
+            profileListener?.remove()
+            profileListener = nil
             user = nil
             userProfile = nil
             isAuthenticated = false
@@ -99,18 +103,30 @@ final class AuthManager: ObservableObject {
         }
     }
 
-    private func fetchUserProfile(uid: String) async {
-        do {
-            let doc = try await db.collection("users").document(uid).getDocument()
-            if doc.exists {
-                self.userProfile = try doc.data(as: AppUserProfile.self)
-            } else {
-                self.userProfile = AppUserProfile(type: "user", email: user?.email, displayName: nil)
+    // Snapshot listener: auto-recovers when connectivity is restored, handles
+    // the cold-start token timing window that caused one-shot getDocument() to
+    // return "Missing or insufficient permissions".
+    private func installProfileListener(uid: String) {
+        profileListener?.remove()
+        profileListener = db.collection("users").document(uid)
+            .addSnapshotListener { [weak self] snapshot, error in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if let error {
+                        print("Failed to fetch user profile: \(error)")
+                        if self.userProfile == nil {
+                            self.userProfile = AppUserProfile(type: "user", email: self.user?.email, displayName: nil)
+                        }
+                        return
+                    }
+                    guard let snapshot else { return }
+                    if snapshot.exists {
+                        self.userProfile = try? snapshot.data(as: AppUserProfile.self)
+                    } else {
+                        self.userProfile = AppUserProfile(type: "user", email: self.user?.email, displayName: nil)
+                    }
+                }
             }
-        } catch {
-            print("Failed to fetch user profile: \(error)")
-            self.userProfile = AppUserProfile(type: "user", email: user?.email, displayName: nil)
-        }
     }
 
     private func installAuthStateListener() {
@@ -118,11 +134,13 @@ final class AuthManager: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.user = user
-                
+
                 if let user {
-                    await self.fetchUserProfile(uid: user.uid)
+                    self.installProfileListener(uid: user.uid)
                     self.isAuthenticated = true
                 } else {
+                    self.profileListener?.remove()
+                    self.profileListener = nil
                     self.userProfile = nil
                     self.isAuthenticated = false
                 }

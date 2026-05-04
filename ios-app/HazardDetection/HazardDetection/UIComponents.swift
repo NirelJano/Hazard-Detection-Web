@@ -68,12 +68,13 @@ struct HeaderBadge: View {
 struct StatTile: View {
     let value: String
     let label: String
+    var accent: Color = .white
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
                 .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(accent)
             Text(label)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.appDark400)
@@ -83,6 +84,26 @@ struct StatTile: View {
         .background(Color.appDark900)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
+}
+
+struct StatusBadge: View {
+    let status: String
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.18))
+            .clipShape(Capsule())
+    }
+
+    private var label: String {
+        ReportStatus(rawValue: status.lowercased())?.displayName.uppercased() ?? status.uppercased()
+    }
+
+    private var color: Color { Color.forStatus(status) }
 }
 
 struct ActionRow: View {

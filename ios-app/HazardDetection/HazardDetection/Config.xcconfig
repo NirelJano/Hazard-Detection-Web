@@ -12,4 +12,4 @@ CLOUDINARY_UPLOAD_PRESET = Road_Hazard_Detection_WEB
 // ========================================
 // MAPBOX CONFIGURATION
 // ========================================
-MAPBOX_ACCESS_TOKEN = YOUR_MAPBOX_PUBLIC_TOKEN
+MAPBOX_ACCESS_TOKEN = YOUR_MAPBOX_ACCESS_TOKEN

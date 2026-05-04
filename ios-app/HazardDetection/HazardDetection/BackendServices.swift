@@ -125,6 +125,57 @@ final class ReportRepository: ObservableObject {
         detectionSource: String? = nil,
         detectionBoundingBox: DetectionBoundingBox? = nil
     ) async throws {
+        // Forward to the multi-detection overload using a single-element array (backward compat shim)
+        let singleDetection: [DetectionCandidate]
+        if let label = detectionLabel {
+            singleDetection = [DetectionCandidate(
+                label: label,
+                confidence: Float(detectionConfidence ?? 0),
+                boundingBox: detectionBoundingBox?.rect ?? .zero
+            )]
+        } else {
+            singleDetection = []
+        }
+        let source: DetectionSource = {
+            switch detectionSource {
+            case DetectionSource.liveCamera.rawValue:
+                return .liveCamera
+            case DetectionSource.liveAutoDetection.rawValue:
+                return .liveAutoDetection
+            default:
+                return .upload
+            }
+        }()
+        try await addReport(
+            type: type,
+            description: description,
+            lat: lat,
+            lng: lng,
+            address: address,
+            image: image,
+            userProfile: userProfile,
+            userId: userId,
+            createdAtMillis: createdAtMillis,
+            detections: singleDetection,
+            detectionSource: source
+        )
+    }
+
+    /// Multi-detection overload — used by DetectionReportPipeline for both live and upload flows.
+    func addReport(
+        type: String,
+        description: String?,
+        lat: Double,
+        lng: Double,
+        address: String?,
+        image: UIImage?,
+        userProfile: AppUserProfile?,
+        userId: String,
+        createdAtMillis: Int64,
+        detections: [DetectionCandidate],
+        detectionSource: DetectionSource,
+        metadata: FrameMetadata? = nil
+    ) async throws {
         guard Auth.auth().currentUser?.uid == userId else {
             throw AppBackendError.unauthenticated
         }
@@ -133,10 +184,19 @@ final class ReportRepository: ObservableObject {
         errorMessage = nil
         defer { isUploading = false }
 
+        let primaryDetection = detections.max(by: { $0.confidence < $1.confidence })
+        let primaryLabel = primaryDetection?.label ?? type
+        let primaryConfidence = primaryDetection.map { Double($0.confidence) }
+        let primaryBoundingBox = primaryDetection.map { DetectionBoundingBox(from: $0.boundingBox) }
+
         do {
             var imageUrl: String? = nil
             if let image {
-                imageUrl = try await CloudinaryService.shared.uploadImage(image)
+                do {
+                    imageUrl = try await CloudinaryService.shared.uploadImage(image)
+                } catch {
+                    print("[addReport] Cloudinary upload failed, saving without image: \(error)")
+                }
             }
 
             let formatter = DateFormatter()
@@ -146,7 +206,7 @@ final class ReportRepository: ObservableObject {
 
             let reportRef = db.collection("reports").document()
             let counterRef = db.collection("metadata").document("reportCounter")
-            
+
             let newId = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
                 let counterDoc: DocumentSnapshot
                 do {
@@ -155,15 +215,15 @@ final class ReportRepository: ObservableObject {
                     errorPointer?.pointee = fetchError
                     return nil
                 }
-                
+
                 let oldCount = counterDoc.data()?["count"] as? Int ?? 0
                 let newCount = oldCount + 1
-                
+
                 transaction.setData(["count": newCount], forDocument: counterRef, merge: true)
 
                 var data: [String: Any] = [
                     "id": newCount,
-                    "hazardType": type,
+                    "hazardType": primaryLabel,
                     "date": dateString,
                     "createdAt": createdAtMillis,
                     "coordinate": GeoPoint(latitude: lat, longitude: lng),
@@ -173,16 +233,38 @@ final class ReportRepository: ObservableObject {
                     "status": "new"
                 ]
                 if let description { data["description"] = description }
-                if let detectionLabel { data["detectedLabel"] = detectionLabel }
-                if let detectionConfidence { data["detectionConfidence"] = detectionConfidence }
-                if let detectionSource { data["detectionSource"] = detectionSource }
-                if let detectionBoundingBox { data["detectionBoundingBox"] = detectionBoundingBox.dictionary }
+                if let metadata {
+                    data["source"] = detectionSource.rawValue
+                    data["timestamp"] = Timestamp(date: metadata.timestamp)
+                    if let speed = metadata.speed, speed >= 0 { data["speedMetersPerSecond"] = speed }
+                    if let heading = metadata.heading, heading >= 0 { data["heading"] = heading }
+                    if let horizontalAccuracy = metadata.horizontalAccuracy { data["horizontalAccuracy"] = horizontalAccuracy }
+                    data["imageWidth"] = metadata.imageWidth
+                    data["imageHeight"] = metadata.imageHeight
+                    if let modelVersion = metadata.modelVersion { data["modelVersion"] = modelVersion }
+                }
+
+                // Legacy single-detection fields (always written for web dashboard compatibility)
+                data["detectedLabel"] = primaryLabel
+                if let primaryConfidence { data["detectionConfidence"] = primaryConfidence }
+                data["detectionSource"] = detectionSource.rawValue
+                if let primaryBoundingBox { data["detectionBoundingBox"] = primaryBoundingBox.dictionary }
+
+                // New multi-detection fields
+                data["primaryLabel"] = primaryLabel
+                if let primaryConfidence { data["primaryConfidence"] = primaryConfidence }
+                data["detections"] = detections.map { d -> [String: Any] in
+                    [
+                        "label": d.label,
+                        "confidence": Double(d.confidence),
+                        "boundingBox": DetectionBoundingBox(from: d.boundingBox).dictionary
+                    ]
+                }
 
                 transaction.setData(data, forDocument: reportRef)
-                
                 return newCount
             })
-            print("Firestore report created with id: \(newId ?? -1)")
+            print("Firestore report created with id: \(newId ?? -1), source: \(detectionSource.rawValue), detections: \(detections.count)")
         } catch {
             errorMessage = error.localizedDescription
             print("Failed to create report: \(error.localizedDescription)")
@@ -233,9 +315,25 @@ final class AppController: ObservableObject {
     let authManager = AuthManager()
     let reportRepository = ReportRepository()
     let locationService = LocationManager()
+    let motionService = MotionService()
+    let roadAttentionService = RoadAttentionService()
+    let pipManager = PictureInPictureManager()
+
+    @Published var autoSaveSnapshotsEnabled: Bool = UserDefaults.standard.object(forKey: "autoSaveSnapshots") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(autoSaveSnapshotsEnabled, forKey: "autoSaveSnapshots") }
+    }
+
+    private(set) lazy var pipeline: DetectionReportPipeline = {
+        DetectionReportPipeline(
+            repository: reportRepository,
+            attentionService: roadAttentionService,
+            aggregator: CandidateAggregator(),
+            deduplication: ReportDeduplicationService(repository: reportRepository),
+            motionService: motionService
+        )
+    }()
 
     private var cancellables = Set<AnyCancellable>()
-    private var recentlySavedLabels: [String: Date] = [:]
 
     var isAdmin: Bool { userProfile?.type == "admin" }
 
@@ -260,51 +358,16 @@ final class AppController: ObservableObject {
         reportRepository.fetchReports()
     }
 
-    func createManualReport(
-        image: UIImage?,
-        hazardType: String,
-        detection: DetectionCandidate? = nil
-    ) {
-        guard let userId = authManager.user?.uid else {
-            uploadMessage = AppBackendError.unauthenticated.localizedDescription
-            return
-        }
-        guard let coordinate = locationService.currentCoordinate else {
-            uploadMessage = AppBackendError.missingLocation.localizedDescription
-            return
-        }
+    // MARK: - Report Creation (via DetectionReportPipeline)
 
-        isUploadingReport = true
-        uploadMessage = nil
-        Task {
-            do {
-                try await reportRepository.addReport(
-                    type: hazardType,
-                    description: nil,
-                    lat: coordinate.latitude,
-                    lng: coordinate.longitude,
-                    image: image,
-                    userProfile: userProfile,
-                    userId: userId,
-                    detectionLabel: detection?.label,
-                    detectionConfidence: detection.map { Double($0.confidence) },
-                    detectionSource: detection != nil ? "manual_image" : nil,
-                    detectionBoundingBox: detection.map { DetectionBoundingBox(from: $0.boundingBox) }
-                )
-                uploadMessage = "Report saved."
-            } catch {
-                uploadMessage = error.localizedDescription
-            }
-            isUploadingReport = false
-        }
-    }
-
+    /// Saves a manually triggered upload report through the shared pipeline.
     func createUploadedReport(
         image: UIImage,
         hazardType: String,
         coordinate: CLLocationCoordinate2D,
         address: String,
-        detections: [DetectionCandidate]
+        detections: [DetectionCandidate],
+        description: String? = nil
     ) {
         guard let userId = authManager.user?.uid else {
             uploadMessage = AppBackendError.unauthenticated.localizedDescription
@@ -314,27 +377,32 @@ final class AppController: ObservableObject {
             uploadMessage = "Cannot save: missing detection data"
             return
         }
-
         isUploadingReport = true
         uploadMessage = nil
         Task {
+            let metadata = buildMetadata(
+                lat: coordinate.latitude,
+                lng: coordinate.longitude,
+                imageSize: image.size
+            )
+            let input = DetectionInput(
+                image: image,
+                source: .upload,
+                metadata: metadata,
+                detections: detections,
+                frameId: UUID(),
+                description: description,
+                preResolvedAddress: address.isEmpty ? nil : address
+            )
             do {
-                try await reportRepository.addReport(
-                    type: hazardType,
-                    description: nil,
-                    lat: coordinate.latitude,
-                    lng: coordinate.longitude,
-                    address: address,
-                    image: image,
-                    userProfile: userProfile,
-                    userId: userId,
-                    createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
-                    detectionLabel: hazardType,
-                    detectionConfidence: detections.map(\.confidence).max().map(Double.init),
-                    detectionSource: "manual_image",
-                    detectionBoundingBox: detections.first.map { DetectionBoundingBox(from: $0.boundingBox) }
-                )
-                uploadMessage = "Report saved."
+                let result = try await pipeline.process(input: input, userId: userId, userProfile: userProfile)
+                switch result.outcome {
+                case .saved: uploadMessage = "Report saved."
+                case .duplicate: uploadMessage = "Skipped duplicate report."
+                case .belowThreshold: uploadMessage = "No hazard detected."
+                case .error(let e): uploadMessage = e.localizedDescription
+                default: break
+                }
             } catch {
                 uploadMessage = error.localizedDescription
             }
@@ -342,58 +410,63 @@ final class AppController: ObservableObject {
         }
     }
 
+    /// Submits a live detection report through the shared pipeline.
     func submitLiveReport(_ trigger: LiveReportTrigger) {
         guard let userId = authManager.user?.uid else {
             liveMessage = AppBackendError.unauthenticated.localizedDescription
             return
         }
-        guard shouldSaveLiveReport(label: trigger.label) else { return }
         guard let location = locationService.currentLocation else {
             liveMessage = AppBackendError.missingLocation.localizedDescription
             return
         }
-        guard !hasNearbyDuplicate(
-            label: trigger.label,
-            latitude: location.coordinate.latitude,
-            longitude: location.coordinate.longitude
-        ) else {
-            liveMessage = "Skipped duplicate \(trigger.label)."
-            return
-        }
-
-        let coordinate = location.coordinate
-        liveMessage = "Resolving \(trigger.label) location..."
-        recentlySavedLabels[trigger.label] = Date()
-
+        liveMessage = "Confirming \(trigger.label)..."
         Task {
+            var metadata = buildMetadata(
+                lat: location.coordinate.latitude,
+                lng: location.coordinate.longitude,
+                imageSize: trigger.image.size
+            )
+            metadata.speed = location.speed
+            metadata.heading = location.course
+            metadata.horizontalAccuracy = location.horizontalAccuracy
+            let input = DetectionInput(
+                image: trigger.image,
+                source: .liveCamera,
+                metadata: metadata,
+                detections: [trigger.candidate],
+                frameId: UUID()
+            )
             do {
-                let address = try await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
-                let annotated = ImageAnnotator.drawBoundingBoxes(
-                    on: trigger.image,
-                    detections: [trigger.candidate]
-                )
-                liveMessage = "Saving \(trigger.label)..."
-                try await reportRepository.addReport(
-                    type: trigger.label,
-                    description: "Live detection",
-                    lat: coordinate.latitude,
-                    lng: coordinate.longitude,
-                    address: address,
-                    image: annotated,
-                    userProfile: userProfile,
-                    userId: userId,
-                    createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
-                    detectionLabel: trigger.label,
-                    detectionConfidence: Double(trigger.confidence),
-                    detectionSource: "live_camera",
-                    detectionBoundingBox: DetectionBoundingBox(from: trigger.boundingBox)
-                )
-                liveMessage = "Saved \(trigger.label) report."
+                let result = try await pipeline.process(input: input, userId: userId, userProfile: userProfile)
+                switch result.outcome {
+                case .saved: liveMessage = "Saved \(trigger.label) report."
+                case .duplicate: liveMessage = "Skipped duplicate \(trigger.label)."
+                case .qualityGateFailed(let hint): liveMessage = hint.rawValue
+                case .notConfirmed: liveMessage = nil
+                case .error(let e): liveMessage = e.localizedDescription
+                default: break
+                }
             } catch {
-                recentlySavedLabels.removeValue(forKey: trigger.label)
                 liveMessage = error.localizedDescription
             }
         }
+    }
+
+    // MARK: - Metadata builder
+
+    func buildMetadata(lat: Double, lng: Double, imageSize: CGSize) -> FrameMetadata {
+        FrameMetadata(
+            timestamp: Date(),
+            latitude: lat,
+            longitude: lng,
+            horizontalAccuracy: locationService.currentLocation?.horizontalAccuracy,
+            heading: locationService.currentLocation?.course,
+            speed: locationService.currentLocation?.speed,
+            imageWidth: Int(imageSize.width),
+            imageHeight: Int(imageSize.height),
+            modelVersion: "best_v1"
+        )
     }
 
     private func bindManagers() {
@@ -441,26 +514,6 @@ final class AppController: ObservableObject {
             .assign(to: &$isUploadingReport)
     }
 
-    private func shouldSaveLiveReport(label: String) -> Bool {
-        guard let lastSave = recentlySavedLabels[label] else { return true }
-        return Date().timeIntervalSince(lastSave) >= 10
-    }
-
-    private func hasNearbyDuplicate(label: String, latitude: Double, longitude: Double) -> Bool {
-        let current = CLLocation(latitude: latitude, longitude: longitude)
-        let now = Int64(Date().timeIntervalSince1970 * 1000)
-        let recent = reports
-            .filter { $0.hazardType == label }
-            .sorted { ($0.createdAt ?? 0) > ($1.createdAt ?? 0) }
-            .prefix(10)
-
-        return recent.contains { report in
-            guard report.hazardType == label else { return false }
-            guard let createdAt = report.createdAt, now - createdAt < 30_000 else { return false }
-            let reportLocation = CLLocation(latitude: report.coordinate.latitude, longitude: report.coordinate.longitude)
-            return current.distance(from: reportLocation) < 5
-        }
-    }
 }
 
 enum TrackState: String {
@@ -479,6 +532,7 @@ struct TrackedOverlay: Identifiable, Equatable {
     var currentBoundingBox: CGRect
     var targetBoundingBox: CGRect
     var confidence: Float
+    var isFresh: Bool
 
     var displayLabel: String {
         state == .confirmed ? label : "\(label) (?)"
@@ -487,7 +541,7 @@ struct TrackedOverlay: Identifiable, Equatable {
     var color: Color {
         switch state {
         case .tentative: return .yellow
-        case .confirmed: return .appSuccess
+        case .confirmed: return isFresh ? .appSuccess : .appWarning
         case .vanished: return .appDanger
         case .reported, .deleted: return .appDark400
         }
@@ -506,7 +560,7 @@ struct LiveReportTrigger {
 struct DetectionTracker {
     private var active: [TrackedDetection] = []
     private var nextID = 1
-    private let maxAge = 15
+    private let maxAge = 6
     private let minHits = 1
     private let iouThreshold: CGFloat = 0.30
 
@@ -520,7 +574,9 @@ struct DetectionTracker {
         frame: UIImage?,
         speed: CLLocationSpeed
     ) -> (overlays: [TrackedOverlay], reports: [LiveReportTrigger]) {
-        let confidenceThreshold: Float = speed > 13.8 ? 0.30 : 0.40
+        let confidenceThreshold: Float = speed > DetectionConfig.highSpeedMSCutoff
+            ? DetectionConfig.highSpeedThreshold
+            : DetectionConfig.displayThreshold
         let filtered = detections.filter { $0.confidence >= confidenceThreshold }
 
         for index in active.indices where active[index].state != .reported {
@@ -602,19 +658,16 @@ struct DetectionTracker {
 
         let overlays = active.compactMap { track -> TrackedOverlay? in
             guard track.state != .deleted, track.state != .reported else { return nil }
-            var predicted = track.candidate.boundingBox
-            if track.age > 0 {
-                predicted.origin.x += track.velocity.dx * CGFloat(track.age)
-                predicted.origin.y += track.velocity.dy * CGFloat(track.age)
-            }
+            let box = track.candidate.boundingBox
             return TrackedOverlay(
                 id: track.id,
                 label: track.label,
                 state: track.state,
                 age: track.age,
-                currentBoundingBox: predicted,
-                targetBoundingBox: predicted,
-                confidence: track.candidate.confidence
+                currentBoundingBox: box,
+                targetBoundingBox: box,
+                confidence: track.candidate.confidence,
+                isFresh: track.age == 0
             )
         }
 
@@ -652,8 +705,10 @@ private struct TrackedDetection {
         let frameScore = CGFloat(candidate.confidence) * rect.width * rect.height
         frameBuffer.append(DetectionFrame(image: image, candidate: candidate, score: frameScore))
         frameBuffer.sort { $0.score > $1.score }
-        if frameBuffer.count > 5 {
-            frameBuffer.removeLast(frameBuffer.count - 5)
+        // Keep only the 2 best frames — enough for a quality report image while
+        // bounding memory to ~2.4 MB per tracked detection at 640x480.
+        if frameBuffer.count > 2 {
+            frameBuffer.removeLast(frameBuffer.count - 2)
         }
     }
 
@@ -758,12 +813,4 @@ enum DetectionGeometry {
     }
 }
 
-private extension CGRect {
-    func iou(with other: CGRect) -> CGFloat {
-        let intersection = self.intersection(other)
-        guard !intersection.isNull else { return 0 }
-        let intersectionArea = intersection.width * intersection.height
-        let unionArea = width * height + other.width * other.height - intersectionArea
-        return unionArea <= 0 ? 0 : intersectionArea / unionArea
-    }
-}
+// CGRect.iou(with:) is defined in ReportDeduplicationService.swift

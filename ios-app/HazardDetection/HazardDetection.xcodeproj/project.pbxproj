@@ -24,6 +24,7 @@
 		691348598E1D416E920C59BA /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = FAD148198B174BE6AF2CCB9B /* FirebaseFirestore */; };
 		6F7F85801AD74C7C86DC8C76 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37ED961A5C049309E9FEE23 /* DesignSystem.swift */; };
 		86011AFF1ED04EC8B301E6BA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 353549FD484547A0965B2FF7 /* ContentView.swift */; };
+		8B6CCC192FA105D200E2E980 /* CameraSessionNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6CCC182FA105D200E2E980 /* CameraSessionNotifications.swift */; };
 		8B7D48982F9E1CA9008FA8A2 /* Info 2.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8B7D48972F9E1CA9008FA8A2 /* Info 2.plist */; };
 		8BBED18D2F9E2031007A7818 /* SETUP_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 8BBED18C2F9E2031007A7818 /* SETUP_CHECKLIST.md */; };
 		8BBED18F2F9E2050007A7818 /* BACKEND_SETUP_README.md in Resources */ = {isa = PBXBuildFile; fileRef = 8BBED18E2F9E2050007A7818 /* BACKEND_SETUP_README.md */; };
@@ -37,6 +38,16 @@
 		8BBED1A12F9E29C3007A7818 /* START_HERE.md in Resources */ = {isa = PBXBuildFile; fileRef = 8BBED1A02F9E29C3007A7818 /* START_HERE.md */; };
 		8BBED1A32F9E2B53007A7818 /* GoogleService-Info 2.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8BBED1A22F9E2B53007A7818 /* GoogleService-Info 2.plist */; };
 		8BBED1A52F9E2BFF007A7818 /* VERIFICATION_CHECKLIST.md in Resources */ = {isa = PBXBuildFile; fileRef = 8BBED1A42F9E2BFF007A7818 /* VERIFICATION_CHECKLIST.md */; };
+		AA1234BB5678901C2D3E4F5A /* ReportsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1234AA5678901C2D3E4F5A /* ReportsService.swift */; };
+		A1B2C3D4E5F600001A2B3C4E /* DetectionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600001A2B3C4D /* DetectionConfig.swift */; };
+		A1B2C3D4E5F600002A2B3C4E /* MotionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600002A2B3C4D /* MotionService.swift */; };
+		A1B2C3D4E5F600003A2B3C4E /* FrameQualityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600003A2B3C4D /* FrameQualityService.swift */; };
+		A1B2C3D4E5F600004A2B3C4E /* RoadAttentionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600004A2B3C4D /* RoadAttentionService.swift */; };
+		A1B2C3D4E5F600005A2B3C4E /* DetectionReportPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600005A2B3C4D /* DetectionReportPipeline.swift */; };
+		A1B2C3D4E5F600006A2B3C4E /* CandidateAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600006A2B3C4D /* CandidateAggregator.swift */; };
+		A1B2C3D4E5F600007A2B3C4E /* ReportDeduplicationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600007A2B3C4D /* ReportDeduplicationService.swift */; };
+		A1B2C3D4E5F600008A2B3C4E /* PictureInPictureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600008A2B3C4D /* PictureInPictureManager.swift */; };
+		A1B2C3D4E5F600009A2B3C4E /* LiveAutoReportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600009A2B3C4D /* LiveAutoReportCoordinator.swift */; };
 		B3C0AA1932124495AE74C62B /* static_detection.png in Resources */ = {isa = PBXBuildFile; fileRef = 7CBEFE416F8B43EA93E73D21 /* static_detection.png */; };
 		BED51BABDECD4E4FBB06CAD3 /* GeocodingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B797B3F37D65495B9CE2BA54 /* GeocodingService.swift */; };
 		C1230F2C36574F8CBF200AF7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FDBB59A3A2C495C81CE11E6 /* SettingsView.swift */; };
@@ -68,6 +79,7 @@
 		6AD464C81579406EBCFED7CB /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		78BD34FC599B43E4A44CC64F /* UploadReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadReportView.swift; sourceTree = "<group>"; };
 		7CBEFE416F8B43EA93E73D21 /* static_detection.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = static_detection.png; sourceTree = "<group>"; };
+		8B6CCC182FA105D200E2E980 /* CameraSessionNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSessionNotifications.swift; sourceTree = "<group>"; };
 		8B7D48972F9E1CA9008FA8A2 /* Info 2.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info 2.plist"; sourceTree = "<group>"; };
 		8BBED1872F9E1F82007A7818 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8BBED1882F9E1FB2007A7818 /* CONFIGURATION_DEBUG.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONFIGURATION_DEBUG.md; sourceTree = "<group>"; };
@@ -89,6 +101,16 @@
 		960C68D492CF459C986CC5F5 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		A35F603661224CF8A5829C1C /* HazardDetection.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HazardDetection.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A96F0FA2AAB44503981D7526 /* best.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = wrapper.pbobjc; path = best.mlmodelc; sourceTree = "<group>"; };
+		AA1234AA5678901C2D3E4F5A /* ReportsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600001A2B3C4D /* DetectionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionConfig.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600002A2B3C4D /* MotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600003A2B3C4D /* FrameQualityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameQualityService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600004A2B3C4D /* RoadAttentionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoadAttentionService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600005A2B3C4D /* DetectionReportPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionReportPipeline.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600006A2B3C4D /* CandidateAggregator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateAggregator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600007A2B3C4D /* ReportDeduplicationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportDeduplicationService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600008A2B3C4D /* PictureInPictureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureInPictureManager.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600009A2B3C4D /* LiveAutoReportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAutoReportCoordinator.swift; sourceTree = "<group>"; };
 		B797B3F37D65495B9CE2BA54 /* GeocodingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeocodingService.swift; sourceTree = "<group>"; };
 		BFB900F91C974969A46FA208 /* report_table.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = report_table.png; sourceTree = "<group>"; };
 		BFCBA29C541F4208AA6595EE /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -143,6 +165,7 @@
 				BFCBA29C541F4208AA6595EE /* MainTabView.swift */,
 				6AD464C81579406EBCFED7CB /* Models.swift */,
 				35AD6F2E36F5490C9D893F1F /* ReportDetailView.swift */,
+				AA1234AA5678901C2D3E4F5A /* ReportsService.swift */,
 				5FDBB59A3A2C495C81CE11E6 /* SettingsView.swift */,
 				36746FDDF4F94C2491321537 /* UIComponents.swift */,
 				78BD34FC599B43E4A44CC64F /* UploadReportView.swift */,
@@ -165,6 +188,16 @@
 				8BBED1A02F9E29C3007A7818 /* START_HERE.md */,
 				8BBED1A22F9E2B53007A7818 /* GoogleService-Info 2.plist */,
 				8BBED1A42F9E2BFF007A7818 /* VERIFICATION_CHECKLIST.md */,
+				8B6CCC182FA105D200E2E980 /* CameraSessionNotifications.swift */,
+				A1B2C3D4E5F600001A2B3C4D /* DetectionConfig.swift */,
+				A1B2C3D4E5F600002A2B3C4D /* MotionService.swift */,
+				A1B2C3D4E5F600003A2B3C4D /* FrameQualityService.swift */,
+				A1B2C3D4E5F600004A2B3C4D /* RoadAttentionService.swift */,
+				A1B2C3D4E5F600005A2B3C4D /* DetectionReportPipeline.swift */,
+				A1B2C3D4E5F600006A2B3C4D /* CandidateAggregator.swift */,
+				A1B2C3D4E5F600007A2B3C4D /* ReportDeduplicationService.swift */,
+				A1B2C3D4E5F600008A2B3C4D /* PictureInPictureManager.swift */,
+				A1B2C3D4E5F600009A2B3C4D /* LiveAutoReportCoordinator.swift */,
 			);
 			path = HazardDetection;
 			sourceTree = "<group>";
@@ -274,6 +307,7 @@
 				6F7F85801AD74C7C86DC8C76 /* DesignSystem.swift in Sources */,
 				48376481D8264DA6A13DBF18 /* LiveDetectionView.swift in Sources */,
 				59CBF264FA7349E7A60A50F7 /* BackendServices.swift in Sources */,
+				8B6CCC192FA105D200E2E980 /* CameraSessionNotifications.swift in Sources */,
 				29F5CED478AF47CAA3E449EC /* AuthManager.swift in Sources */,
 				FD6976DBEAD04D9D9A938C61 /* AuthenticationView.swift in Sources */,
 				CF6FEA6CFB144DB59DD33F13 /* CloudinaryService.swift in Sources */,
@@ -283,9 +317,19 @@
 				D3079742317D425A91BB2CA8 /* MainTabView.swift in Sources */,
 				2E104EFE44704EEA84A64B12 /* Models.swift in Sources */,
 				672358AEADCE47C4BA760F87 /* ReportDetailView.swift in Sources */,
+				AA1234BB5678901C2D3E4F5A /* ReportsService.swift in Sources */,
 				C1230F2C36574F8CBF200AF7 /* SettingsView.swift in Sources */,
 				141B3FD1B6AC45288093CA79 /* UIComponents.swift in Sources */,
 				08DFF7C379524BD0A481D146 /* UploadReportView.swift in Sources */,
+				A1B2C3D4E5F600001A2B3C4E /* DetectionConfig.swift in Sources */,
+				A1B2C3D4E5F600002A2B3C4E /* MotionService.swift in Sources */,
+				A1B2C3D4E5F600003A2B3C4E /* FrameQualityService.swift in Sources */,
+				A1B2C3D4E5F600004A2B3C4E /* RoadAttentionService.swift in Sources */,
+				A1B2C3D4E5F600005A2B3C4E /* DetectionReportPipeline.swift in Sources */,
+				A1B2C3D4E5F600006A2B3C4E /* CandidateAggregator.swift in Sources */,
+				A1B2C3D4E5F600007A2B3C4E /* ReportDeduplicationService.swift in Sources */,
+				A1B2C3D4E5F600008A2B3C4E /* PictureInPictureManager.swift in Sources */,
+				A1B2C3D4E5F600009A2B3C4E /* LiveAutoReportCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -294,6 +338,7 @@
 /* Begin XCBuildConfiguration section */
 		400129B407F243E5BAD04E86 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8BBED19A2F9E296F007A7818 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -301,6 +346,7 @@
 				ASSET_SYMBOL_GENERATION = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_USE_OPTIMIZATION_PROFILE = YES;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = Z3XLCBKN9K;
 				INFOPLIST_FILE = HazardDetection/Info.plist;
@@ -361,6 +407,7 @@
 		};
 		8F95C0FA188842C9B93F5162 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8BBED19A2F9E296F007A7818 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -368,6 +415,7 @@
 				ASSET_SYMBOL_GENERATION = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_USE_OPTIMIZATION_PROFILE = YES;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = Z3XLCBKN9K;
 				INFOPLIST_FILE = HazardDetection/Info.plist;

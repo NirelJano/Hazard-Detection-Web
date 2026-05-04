@@ -14,7 +14,32 @@
       "Read(//Library/Frameworks/Python.framework/Versions/3.13/bin/**)",
       "Bash(/Library/Frameworks/Python.framework/Versions/3.13/bin/git-filter-repo --replace-text /tmp/git-secrets-replacements.txt --force)",
       "Bash(git remote *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npx firebase-tools@latest deploy --only firestore)",
+      "Bash(npx firebase-tools@latest login:list)",
+      "Bash(npx firebase-tools@latest projects:list)",
+      "Bash(xcrun xctrace *)",
+      "Bash(xcodebuild -list)",
+      "Bash(xcodebuild -scheme HazardDetection -configuration Debug -destination id=00008140-000C5D3A3CE0801C -allowProvisioningUpdates build)",
+      "Bash(xcrun devicectl *)",
+      "Bash(plutil -p \"/Users/shachafemanoel/Library/Developer/Xcode/DerivedData/HazardDetection-dzwhndyddktdohfloeilozewhcsg/Build/Products/Debug-iphoneos/HazardDetection.app/Info.plist\")",
+      "Bash(xcodebuild -scheme HazardDetection -destination 'platform=iOS Simulator,name=iPhone 16' build)",
+      "Bash(xcodebuild -scheme HazardDetection -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build)",
+      "Bash(open *)",
+      "Bash(xcodebuild -scheme HazardDetection -destination 'id=00008140-000C5D3A3CE0801C' -configuration Debug build)",
+      "Bash(xcodebuild -scheme HazardDetection -destination 'id=00008140-000C5D3A3CE0801C' -configuration Debug install)",
+      "Bash(xcodebuild -scheme HazardDetection -showBuildSettings -configuration Debug)",
+      "Bash(xcodebuild -project HazardDetection.xcodeproj -scheme HazardDetection -destination 'id=00008140-000C5D3A3CE0801C' -configuration Debug build)",
+      "Bash(wait)",
+      "Bash(xcodebuild -project HazardDetection.xcodeproj -scheme HazardDetection -destination 'id=00008140-000C5D3A3CE0801C' -configuration Release build)",
+      "Bash(xcodebuild -project HazardDetection.xcodeproj -scheme HazardDetection -destination id=00008140-000C5D3A3CE0801C -configuration Release build)",
+      "Bash(xcodebuild -scheme HazardDetection -destination 'generic/platform=iOS' -configuration Debug build)",
+      "Bash(xcodebuild -scheme HazardDetection -destination 'generic/platform=iOS' -configuration Release build)",
+      "Bash(grep -v \"^Name\\\\|^$\\\\|^---\")",
+      "Bash(xargs ls *)",
+      "Bash(xargs -I{} basename {})",
+      "Bash(xcodebuild -project HazardDetection.xcodeproj -scheme HazardDetection -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO)",
+      "Bash(plutil -p \"/Users/shachafemanoel/Documents/GitHub/Hazard Detection Web/ios-app/HazardDetection/HazardDetection/best.mlpackage/Data/com.apple.CoreML/model.mlmodel\")"
     ]
   }
 }

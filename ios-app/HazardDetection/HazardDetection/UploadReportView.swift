@@ -16,6 +16,8 @@ struct UploadReportView: View {
     @State private var statusColor: Color = .appWarning
     @State private var isProcessing = false
     @State private var showingCamera = false
+    @State private var showingScanner = false
+    @State private var scannedDescription: String?
     @State private var shouldClearAfterSave = false
 
     private var uniqueDetectionLabel: String? {
@@ -24,9 +26,10 @@ struct UploadReportView: View {
         return unique.isEmpty ? nil : unique.joined(separator: ", ")
     }
 
+    // Plain downscaled image — annotation is applied inside DetectionReportPipeline
     private var reportImage: UIImage? {
         guard let selectedImage else { return nil }
-        return ImageAnnotator.drawBoundingBoxes(on: selectedImage, detections: detectedCandidates)
+        return downscaled(selectedImage)
     }
 
     private var canSave: Bool {
@@ -34,15 +37,21 @@ struct UploadReportView: View {
         !detectedCandidates.isEmpty &&
         selectedImage != nil &&
         resolvedCoordinate != nil &&
-        resolvedAddress != nil
+        app.currentUser != nil
     }
 
     var body: some View {
         FormScreen(title: "Upload Report", subtitle: "Detect hazards from camera or gallery images.") {
             HStack(spacing: 12) {
                 Button {
-                    app.locationService.requestPermission()
-                    showingCamera = true
+                    Task {
+                        let status = AVCaptureDevice.authorizationStatus(for: .video)
+                        if status == .notDetermined {
+                            _ = await AVCaptureDevice.requestAccess(for: .video)
+                        }
+                        app.locationService.requestPermission()
+                        await MainActor.run { showingCamera = true }
+                    }
                 } label: {
                     UploadSourceButton(icon: "camera.fill", title: "Camera")
                 }
@@ -54,6 +63,32 @@ struct UploadReportView: View {
                 .onChange(of: selectedItem) { _, item in
                     Task { await loadGalleryImage(from: item) }
                 }
+
+                Button { showingScanner = true } label: {
+                    UploadSourceButton(icon: "text.viewfinder", title: "Scan")
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let scannedDescription {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "text.viewfinder")
+                        .font(.system(size: 13))
+                        .foregroundColor(.appPrimary)
+                    Text(scannedDescription)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(3)
+                    Spacer()
+                    Button { self.scannedDescription = nil } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.appDark400)
+                    }
+                }
+                .padding(12)
+                .background(Color.appDark900)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.appPrimary.opacity(0.3), lineWidth: 1))
             }
 
             if isProcessing {
@@ -96,6 +131,16 @@ struct UploadReportView: View {
             CameraImagePicker { image, data in
                 Task { await processImage(image: image, data: data, isCamera: true) }
             }
+            .onAppear { NotificationCenter.default.post(name: .stopLiveCameraSession, object: nil) }
+            .onDisappear { NotificationCenter.default.post(name: .startLiveCameraSession, object: nil) }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showingScanner) {
+            HazardScannerView { text in
+                scannedDescription = text
+            }
+            .onAppear { NotificationCenter.default.post(name: .stopLiveCameraSession, object: nil) }
+            .onDisappear { NotificationCenter.default.post(name: .startLiveCameraSession, object: nil) }
             .ignoresSafeArea()
         }
         .onChange(of: app.uploadMessage) { _, message in
@@ -129,7 +174,10 @@ struct UploadReportView: View {
         }
 
         let coordinate = resolveCoordinate(from: data, isCamera: isCamera)
-        let detections = HazardDetector.shared.detect(in: image)
+        let detections = await HazardDetector.shared.detect(
+            in: image,
+            confidenceThreshold: DetectionConfig.reportCandidateThreshold
+        )
         var address: String?
 
         if let coordinate {
@@ -151,12 +199,12 @@ struct UploadReportView: View {
                     ? "Could not fetch device location. Location is required."
                     : "No GPS data found in image. Location required."
                 statusColor = .appDanger
-            } else if address == nil {
-                statusMessage = "Could not resolve address."
-                statusColor = .appDanger
             } else if detections.isEmpty {
                 statusMessage = "No hazard detected in this image."
                 statusColor = .appDark400
+            } else if address == nil {
+                statusMessage = "Hazard detected. Address unavailable — saving with coordinates only."
+                statusColor = .appWarning
             } else {
                 statusMessage = "Ready to save report."
                 statusColor = .appSuccess
@@ -179,21 +227,42 @@ struct UploadReportView: View {
         guard
             let image = reportImage,
             let label = uniqueDetectionLabel,
-            let coordinate = resolvedCoordinate,
-            let address = resolvedAddress
+            let coordinate = resolvedCoordinate
         else {
-            statusMessage = "Cannot save: missing detection, location, or address."
+            statusMessage = "Cannot save: missing detection or location."
             statusColor = .appDanger
             return
         }
-
+        
+        // Require authentication before saving
+        guard app.currentUser != nil else {
+            statusMessage = "You must be signed in to save reports."
+            statusColor = .appDanger
+            return
+        }
+        
+        print("[UploadReport] Saving report label=\(label), detections=\(detectedCandidates.count), coord=(\(coordinate.latitude),\(coordinate.longitude)), imageSize=\(image.size)")
+        
         app.createUploadedReport(
             image: image,
             hazardType: label,
             coordinate: coordinate,
-            address: address,
-            detections: detectedCandidates
+            address: resolvedAddress ?? "",
+            detections: detectedCandidates,
+            description: scannedDescription
         )
+    }
+
+    private func downscaled(_ image: UIImage, maxDimension: CGFloat = 1600) -> UIImage {
+        let size = image.size
+        let longest = max(size.width, size.height)
+        let scale = min(1, maxDimension / longest)
+        guard scale < 1 else { return image }
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
     }
 
     private func resetForNewImage(image: UIImage, data: Data?) {
@@ -215,6 +284,7 @@ struct UploadReportView: View {
         resolvedCoordinate = nil
         resolvedAddress = nil
         statusMessage = nil
+        scannedDescription = nil
     }
 }
 
@@ -258,43 +328,42 @@ private struct DetectionPreviewCard: View {
     let detections: [DetectionCandidate]
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                ForEach(Array(detections.enumerated()), id: \.offset) { _, detection in
-                    let rect = DetectionGeometry.visionRectToAspectFitRect(
-                        detection.boundingBox,
-                        imageSize: image.size,
-                        containerSize: geometry.size
-                    )
-
-                    ZStack(alignment: .topLeading) {
-                        Rectangle()
-                            .stroke(Color.appSuccess, lineWidth: 2)
-                            .frame(width: rect.width, height: rect.height)
-                            .position(x: rect.midX, y: rect.midY)
-
-                        Text("\(detection.label) \(Int(detection.confidence * 100))%")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.appSuccess)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .position(
-                                x: rect.minX + 60,
-                                y: max(rect.minY - 12, 8)
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                GeometryReader { geometry in
+                    let containerSize = geometry.size
+                    ZStack {
+                        ForEach(Array(detections.enumerated()), id: \.offset) { _, detection in
+                            let rect = DetectionGeometry.visionRectToAspectFitRect(
+                                detection.boundingBox,
+                                imageSize: image.size,
+                                containerSize: containerSize
                             )
+                            ZStack(alignment: .topLeading) {
+                                Rectangle()
+                                    .stroke(Color.appSuccess, lineWidth: 2)
+                                    .frame(width: rect.width, height: rect.height)
+                                    .position(x: rect.midX, y: rect.midY)
+
+                                Text("\(detection.label) \(Int(detection.confidence * 100))%")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.appSuccess)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .position(
+                                        x: rect.minX + 60,
+                                        y: max(rect.minY - 12, 8)
+                                    )
+                            }
+                        }
                     }
                 }
-            }
-        }
-        .frame(height: 220)
+            )
     }
 }
 
@@ -305,7 +374,9 @@ private struct CameraImagePicker: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .photoLibrary
-        picker.cameraCaptureMode = .photo
+        if picker.sourceType == .camera {
+            picker.cameraCaptureMode = .photo
+        }
         picker.delegate = context.coordinator
         return picker
     }
@@ -358,6 +429,69 @@ enum ImageGPSExtractor {
     }
 }
 
+struct HazardScannerView: View {
+    let onScan: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var scannedText: String = ""
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.appDark950.ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Describe the Hazard")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("Enter details about what you observed")
+                            .font(.system(size: 14))
+                            .foregroundColor(.appDark400)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    TextEditor(text: $scannedText)
+                        .font(.system(size: 15))
+                        .foregroundColor(.white)
+                        .scrollContentBackground(.hidden)
+                        .padding(14)
+                        .background(Color.appDark900)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                        .frame(height: 200)
+                    
+                    Button {
+                        if !scannedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            onScan(scannedText)
+                            dismiss()
+                        }
+                    } label: {
+                        Text("Add Description")
+                            .primaryButtonStyle()
+                    }
+                    .disabled(scannedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity(scannedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+                    
+                    Spacer()
+                }
+                .padding(24)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(.appPrimary)
+                }
+            }
+        }
+    }
+}
+
 private extension UIImage {
     func normalizedOrientation() -> UIImage {
         guard imageOrientation != .up else { return self }
@@ -367,3 +501,4 @@ private extension UIImage {
         }
     }
 }
+

@@ -2,30 +2,87 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===============================================================
+    // Data Model
+    // ===============================================================
+    //
+    // Collection: users / Document ID: Firebase Auth UID
+    //   - type: string (required) — "user" | "admin"
+    //   - email: string (optional)
+    //   - displayName: string (optional)
+    //
+    // Collection: reports / Document ID: auto-generated
+    //   - id: number (required) — sequential counter
+    //   - hazardType: string (required, < 100 chars)
+    //   - date: string (required, < 30 chars)
+    //   - createdAt: number (required) — epoch ms
+    //   - coordinate: GeoPoint (required)
+    //   - address: string (required, < 300 chars)
+    //   - imageUrl: string (required, may be empty, < 500 chars)
+    //   - reportedBy: string (required, < 100 chars)
+    //   - status: string (required) — "new" | "in-progress" | "fixed"
+    //   - description, detectedLabel, detectionConfidence,
+    //     detectionSource, detectionBoundingBox: optional
+    //
+    // Collection: metadata / Document ID: "reportCounter"
+    //   - count: number (required) — incremented inside transactions
+    //
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
     function isAdmin() {
-      return request.auth != null &&
+      return isAuthenticated() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.type == 'admin';
     }
 
-    // users/{uid}: own doc access; admins can read all; no self-promotion to admin
+    function isValidStatus(status) {
+      return status in ['new', 'in-progress', 'fixed'];
+    }
+
+    function isValidReport(data) {
+      return data.hazardType is string && data.hazardType.size() > 0 && data.hazardType.size() < 100
+          && data.date is string && data.date.size() > 0 && data.date.size() < 30
+          && data.createdAt is number
+          && data.coordinate is latlng
+          && data.address is string && data.address.size() < 300
+          && data.reportedBy is string && data.reportedBy.size() > 0 && data.reportedBy.size() < 100
+          && data.imageUrl is string && data.imageUrl.size() < 500
+          && isValidStatus(data.status)
+          && (!('description' in data)        || (data.description is string && data.description.size() < 2000))
+          && (!('detectedLabel' in data)       || (data.detectedLabel is string && data.detectedLabel.size() < 100))
+          && (!('detectionConfidence' in data) || data.detectionConfidence is number)
+          && (!('detectionSource' in data)     || (data.detectionSource is string && data.detectionSource.size() < 50));
+    }
+
+    // users: owner reads their own doc; admins can read all
+    // create: type must be "user" — prevents self-promotion to admin
+    // update: owner can change any field except type
     match /users/{uid} {
-      allow read: if request.auth.uid == uid || isAdmin();
-      allow create: if request.auth.uid == uid;
-      allow update: if request.auth.uid == uid &&
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && request.resource.data.type == 'user';
+      allow update: if isOwner(uid) &&
         !('type' in request.resource.data.diff(resource.data).affectedKeys());
       allow delete: if isAdmin();
     }
 
-    // reports/{reportId}: any authenticated user can read/create; only admins can update/delete
+    // reports: any authenticated user can read/create (validated); only admins update/delete
     match /reports/{reportId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidReport(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // metadata/reportCounter: used for sequential report ID generation
+    // metadata/reportCounter: used for sequential ID transactions
     match /metadata/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthenticated();
     }
   }
 }
