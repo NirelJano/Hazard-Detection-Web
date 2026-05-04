@@ -34,6 +34,8 @@
 	<string>This app uses the camera to detect road hazards in real time.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app attaches GPS coordinates to hazard reports.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>This app uses motion data to improve live road hazard detection while driving.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>HazardDetection saves annotated hazard snapshots to your photo library for documentation.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

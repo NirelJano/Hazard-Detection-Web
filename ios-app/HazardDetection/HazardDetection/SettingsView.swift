@@ -80,6 +80,8 @@ struct SettingsView: View {
                 .disabled(failedUploads.isEmpty)
             }
 
+            DetectionTuningSection(preferences: app.detectionPreferences)
+
             VStack(alignment: .leading, spacing: 16) {
                 Text("System Info")
                     .font(.system(size: 16, weight: .semibold))
@@ -143,6 +145,96 @@ struct SettingsView: View {
         case .denied, .restricted: return "Denied"
         case .notDetermined: return "Not Requested"
         @unknown default: return "Unknown"
+        }
+    }
+}
+
+private struct DetectionTuningSection: View {
+    @ObservedObject var preferences: DetectionPreferences
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Detection Tuning")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.appDark400)
+                .padding(.top, 8)
+
+            ToggleRow(
+                title: "Adaptive Threshold",
+                isOn: $preferences.enableAdaptiveThreshold
+            )
+            ToggleRow(
+                title: "Region of Interest",
+                isOn: $preferences.enableROI
+            )
+            ToggleRow(
+                title: "Motion Signals",
+                isOn: $preferences.enableMotionSignals
+            )
+            ToggleRow(
+                title: "Frame Quality",
+                isOn: $preferences.enableFrameQualitySignals
+            )
+            ToggleRow(
+                title: "Debug Overlay",
+                isOn: $preferences.enableDebugOverlay
+            )
+
+            SliderRow(
+                title: "Base Confidence",
+                value: $preferences.baseConfidenceThreshold,
+                range: 0.20...0.85,
+                format: { "\(Int($0 * 100))%" }
+            )
+            SliderRow(
+                title: "Bottom Ignore",
+                value: $preferences.bottomIgnoreRatio,
+                range: 0.0...0.45,
+                format: { "\(Int($0 * 100))%" }
+            )
+
+            Button("Reset Detection Defaults") {
+                preferences.resetToDefaults()
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.appPrimary)
+        }
+    }
+}
+
+private struct ToggleRow: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+        }
+        .tint(.appPrimary)
+    }
+}
+
+private struct SliderRow: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let format: (Double) -> String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                Spacer()
+                Text(format(value))
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.appDark400)
+            }
+            Slider(value: $value, in: range)
+                .tint(.appPrimary)
         }
     }
 }

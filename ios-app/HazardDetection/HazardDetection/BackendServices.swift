@@ -406,6 +406,8 @@ final class AppController: ObservableObject {
     let motionService = MotionService()
     let roadAttentionService = RoadAttentionService()
     let pipManager = PictureInPictureManager()
+    let detectionPreferences = DetectionPreferences()
+    let motionSignalProvider = MotionSignalProvider()
     private(set) lazy var reportCreationService: ReportCreationService = ReportCreationService()
 
     @Published var autoSaveSnapshotsEnabled: Bool = UserDefaults.standard.object(forKey: "autoSaveSnapshots") as? Bool ?? true {

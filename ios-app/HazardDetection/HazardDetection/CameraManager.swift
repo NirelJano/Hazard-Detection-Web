@@ -467,9 +467,10 @@ final class CameraManager: NSObject, ObservableObject {
 
     func updateConfidenceThreshold(forSpeed speed: CLLocationSpeed) {
         frameLock.lock()
-        confidenceThreshold = speed > DetectionConfig.highSpeedMSCutoff
-            ? DetectionConfig.highSpeedThreshold
-            : DetectionConfig.displayThreshold
+        // DetectionGate owns adaptive quality filtering. Keep Vision's live
+        // prefilter low so usable candidates are not discarded before ROI,
+        // motion, and frame-quality context can be applied.
+        confidenceThreshold = 0.20
         frameLock.unlock()
     }
 
