@@ -233,6 +233,7 @@ final class AppController: ObservableObject {
     let authManager = AuthManager()
     let reportRepository = ReportRepository()
     let locationService = LocationManager()
+    private(set) lazy var reportCreationService: ReportCreationService = ReportCreationService(repository: reportRepository)
 
     private var cancellables = Set<AnyCancellable>()
     private var recentlySavedLabels: [String: Date] = [:]
@@ -315,25 +316,23 @@ final class AppController: ObservableObject {
             return
         }
 
+        let draft = ReportDraft(
+            source: .manualUpload,
+            hazardType: hazardType,
+            rawLabel: hazardType,
+            confidence: detections.map(\.confidence).max().map(Double.init),
+            imageData: image.jpegData(compressionQuality: 0.95),
+            boundingBox: detections.first.map { CodableRect($0.boundingBox) },
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            locationSource: .gps
+        )
+
         isUploadingReport = true
         uploadMessage = nil
         Task {
             do {
-                try await reportRepository.addReport(
-                    type: hazardType,
-                    description: nil,
-                    lat: coordinate.latitude,
-                    lng: coordinate.longitude,
-                    address: address,
-                    image: image,
-                    userProfile: userProfile,
-                    userId: userId,
-                    createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
-                    detectionLabel: hazardType,
-                    detectionConfidence: detections.map(\.confidence).max().map(Double.init),
-                    detectionSource: "manual_image",
-                    detectionBoundingBox: detections.first.map { DetectionBoundingBox(from: $0.boundingBox) }
-                )
+                try await reportCreationService.submit(draft, userId: userId, userProfile: userProfile)
                 uploadMessage = "Report saved."
             } catch {
                 uploadMessage = error.localizedDescription
@@ -362,32 +361,26 @@ final class AppController: ObservableObject {
         }
 
         let coordinate = location.coordinate
-        liveMessage = "Resolving \(trigger.label) location..."
         recentlySavedLabels[trigger.label] = Date()
 
+        let annotated = ImageAnnotator.drawBoundingBoxes(on: trigger.image, detections: [trigger.candidate])
+        let draft = ReportDraft(
+            source: .liveDetectionCandidate,
+            hazardType: trigger.label,
+            rawLabel: trigger.label,
+            confidence: Double(trigger.confidence),
+            imageData: annotated.jpegData(compressionQuality: 0.8),
+            boundingBox: CodableRect(trigger.boundingBox),
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            locationSource: .gps,
+            notes: "Live detection"
+        )
+
+        liveMessage = "Saving \(trigger.label)..."
         Task {
             do {
-                let address = try await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
-                let annotated = ImageAnnotator.drawBoundingBoxes(
-                    on: trigger.image,
-                    detections: [trigger.candidate]
-                )
-                liveMessage = "Saving \(trigger.label)..."
-                try await reportRepository.addReport(
-                    type: trigger.label,
-                    description: "Live detection",
-                    lat: coordinate.latitude,
-                    lng: coordinate.longitude,
-                    address: address,
-                    image: annotated,
-                    userProfile: userProfile,
-                    userId: userId,
-                    createdAtMillis: Int64(Date().timeIntervalSince1970 * 1000),
-                    detectionLabel: trigger.label,
-                    detectionConfidence: Double(trigger.confidence),
-                    detectionSource: "live_camera",
-                    detectionBoundingBox: DetectionBoundingBox(from: trigger.boundingBox)
-                )
+                try await reportCreationService.submit(draft, userId: userId, userProfile: userProfile)
                 liveMessage = "Saved \(trigger.label) report."
             } catch {
                 recentlySavedLabels.removeValue(forKey: trigger.label)
