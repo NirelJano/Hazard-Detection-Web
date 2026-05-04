@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import UIKit
 
@@ -23,16 +24,26 @@ final class ReportCreationService {
     func submit(_ draft: ReportDraft, userId: String, userProfile: AppUserProfile?) async throws {
         try validator.validate(draft)
         let preparedImage = try imagePreparer.prepareImage(for: draft)
-        let payload = payloadBuilder.buildPayload(from: draft)
+        let payload = try payloadBuilder.buildPayload(from: draft)
+
+        let resolvedAddress: String?
+        if let preresolved = draft.address {
+            resolvedAddress = preresolved
+        } else {
+            let coordinate = CLLocationCoordinate2D(latitude: payload.lat, longitude: payload.lng)
+            resolvedAddress = try? await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
+        }
 
         try await repository.addReport(
             type: payload.type,
             description: payload.description,
             lat: payload.lat,
             lng: payload.lng,
+            address: resolvedAddress,
             image: preparedImage.uiImage,
             userProfile: userProfile,
             userId: userId,
+            createdAtMillis: payload.createdAtMillis,
             detectionLabel: payload.detectionLabel,
             detectionConfidence: payload.detectionConfidence,
             detectionSource: payload.detectionSource,

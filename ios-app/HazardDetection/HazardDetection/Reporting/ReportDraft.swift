@@ -13,6 +13,7 @@ struct ReportDraft: Identifiable, Codable {
     var createdAt: Date
     var latitude: Double?
     var longitude: Double?
+    var address: String?
     var locationSource: LocationSource
     var notes: String?
     var metadata: DetectionMetadata?
@@ -29,6 +30,7 @@ struct ReportDraft: Identifiable, Codable {
         createdAt: Date = Date(),
         latitude: Double? = nil,
         longitude: Double? = nil,
+        address: String? = nil,
         locationSource: LocationSource = .unknown,
         notes: String? = nil,
         metadata: DetectionMetadata? = nil
@@ -44,6 +46,7 @@ struct ReportDraft: Identifiable, Codable {
         self.createdAt = createdAt
         self.latitude = latitude
         self.longitude = longitude
+        self.address = address
         self.locationSource = locationSource
         self.notes = notes
         self.metadata = metadata

@@ -275,23 +275,23 @@ final class AppController: ObservableObject {
             return
         }
 
+        let draft = ReportDraft(
+            source: .manualUpload,
+            hazardType: hazardType,
+            rawLabel: detection?.label,
+            confidence: detection.map { Double($0.confidence) },
+            imageData: image?.jpegData(compressionQuality: 0.8),
+            boundingBox: detection.map { CodableRect($0.boundingBox) },
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            locationSource: .gps
+        )
+
         isUploadingReport = true
         uploadMessage = nil
         Task {
             do {
-                try await reportRepository.addReport(
-                    type: hazardType,
-                    description: nil,
-                    lat: coordinate.latitude,
-                    lng: coordinate.longitude,
-                    image: image,
-                    userProfile: userProfile,
-                    userId: userId,
-                    detectionLabel: detection?.label,
-                    detectionConfidence: detection.map { Double($0.confidence) },
-                    detectionSource: detection != nil ? "manual_image" : nil,
-                    detectionBoundingBox: detection.map { DetectionBoundingBox(from: $0.boundingBox) }
-                )
+                try await reportCreationService.submit(draft, userId: userId, userProfile: userProfile)
                 uploadMessage = "Report saved."
             } catch {
                 uploadMessage = error.localizedDescription
@@ -325,6 +325,7 @@ final class AppController: ObservableObject {
             boundingBox: detections.first.map { CodableRect($0.boundingBox) },
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
+            address: address,
             locationSource: .gps
         )
 

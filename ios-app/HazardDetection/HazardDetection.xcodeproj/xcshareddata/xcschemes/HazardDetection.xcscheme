@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "78A2132B76F24A10950EDCE3"
+               BlueprintIdentifier = "F0C0FF21525A4D26B071623B"
                BuildableName = "HazardDetection.app"
                BlueprintName = "HazardDetection"
                ReferencedContainer = "container:HazardDetection.xcodeproj">
@@ -44,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "78A2132B76F24A10950EDCE3"
+            BlueprintIdentifier = "F0C0FF21525A4D26B071623B"
             BuildableName = "HazardDetection.app"
             BlueprintName = "HazardDetection"
             ReferencedContainer = "container:HazardDetection.xcodeproj">
@@ -61,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "78A2132B76F24A10950EDCE3"
+            BlueprintIdentifier = "F0C0FF21525A4D26B071623B"
             BuildableName = "HazardDetection.app"
             BlueprintName = "HazardDetection"
             ReferencedContainer = "container:HazardDetection.xcodeproj">

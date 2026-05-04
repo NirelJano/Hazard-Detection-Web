@@ -52,11 +52,11 @@ The app should not treat every live detection as a final report immediately.
 
 ## M0 — Unified Report Pipeline
 
-**Status**: shipped
+**Status**: in-progress
 **Complexity**: M
 **Goal**: Manual upload and live detection use one report creation path.
 
-**Implementation note**: This milestone introduces `ReportDraft`, `ReportCreationService`, `ReportValidationPolicy`, `ReportPayloadBuilder`, and `ReportImagePreparer` under `HazardDetection/Reporting/`. Manual upload (`AppController.createUploadedReport`) and live detection (`AppController.submitLiveReport`) now both create a `ReportDraft` and submit through the same `ReportCreationService`. Existing Cloudinary upload and Firestore write behavior is unchanged.
+**Implementation note**: This milestone introduces `ReportDraft`, `ReportCreationService`, `ReportValidationPolicy`, `ReportPayloadBuilder`, and `ReportImagePreparer` under `HazardDetection/Reporting/`. Manual upload (`AppController.createUploadedReport`) and live detection (`AppController.submitLiveReport`) now both create a `ReportDraft` and submit through the same `ReportCreationService`. `createManualReport` is also routed through the service. Pre-resolved address is preserved on the draft and used by the service instead of re-geocoding. `createdAt` from the draft is respected via `createdAtMillis`. Validation requires location, image, and valid confidence. Image preparer fails fast on corrupt data. Existing Cloudinary upload and Firestore write behavior is unchanged. Build and smoke checks pending on macOS.
 
 ### Problem
 

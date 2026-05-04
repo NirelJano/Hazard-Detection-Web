@@ -3,20 +3,29 @@ import UIKit
 
 struct PreparedReportImage {
     let data: Data
+    let uiImage: UIImage
     let localURL: URL?
-
-    var uiImage: UIImage? { UIImage(data: data) }
 }
 
 struct ReportImagePreparer {
     func prepareImage(for draft: ReportDraft) throws -> PreparedReportImage {
-        if let data = draft.imageData {
-            return PreparedReportImage(data: data, localURL: draft.imageLocalURL)
+        let data: Data
+        let localURL: URL?
+
+        if let d = draft.imageData {
+            data = d
+            localURL = draft.imageLocalURL
+        } else if let url = draft.imageLocalURL {
+            data = try Data(contentsOf: url)
+            localURL = url
+        } else {
+            throw ReportValidationError.missingImage
         }
-        if let url = draft.imageLocalURL {
-            let data = try Data(contentsOf: url)
-            return PreparedReportImage(data: data, localURL: url)
+
+        guard let uiImage = UIImage(data: data) else {
+            throw ReportValidationError.invalidImageData
         }
-        throw ReportValidationError.missingImage
+
+        return PreparedReportImage(data: data, uiImage: uiImage, localURL: localURL)
     }
 }
