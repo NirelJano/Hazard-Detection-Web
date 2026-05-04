@@ -3,6 +3,7 @@ import CoreLocation
 import FirebaseAuth
 import FirebaseFirestore
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -215,6 +216,93 @@ final class ReportRepository: ObservableObject {
             throw error
         }
     }
+
+    /// Commits a queued report to Firestore using `clientReportId` as the
+    /// document ID so retries are safe: if the document already exists the
+    /// transaction is a no-op and the pending report is marked committed.
+    func commitPendingReport(
+        clientReportId: String,
+        draft: ReportDraft,
+        imageUrl: String?,
+        resolvedAddress: String?,
+        userId: String,
+        reportedBy: String,
+        queuedAt: Date,
+        uploadAttempts: Int
+    ) async throws {
+        guard Auth.auth().currentUser?.uid == userId else {
+            throw AppBackendError.unauthenticated
+        }
+        guard let lat = draft.latitude, let lng = draft.longitude else {
+            throw ReportValidationError.missingLocation
+        }
+
+        let detectionSource: String?
+        switch draft.source {
+        case .liveDetectionCandidate: detectionSource = "live_camera"
+        case .manualUpload:           detectionSource = draft.rawLabel != nil ? "manual_image" : nil
+        case .postProcessedSession:   detectionSource = "post_processed"
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd/MM/yy HH:mm"
+        let dateString = formatter.string(from: draft.createdAt)
+        let createdAtMillis = Int64(draft.createdAt.timeIntervalSince1970 * 1000)
+        let queuedAtMillis  = Int64(queuedAt.timeIntervalSince1970 * 1000)
+
+        let reportRef  = db.collection("reports").document(clientReportId)
+        let counterRef = db.collection("metadata").document("reportCounter")
+
+        do {
+            _ = try await db.runTransaction { transaction, errorPointer -> Any? in
+                let counterDoc: DocumentSnapshot
+                let reportDoc: DocumentSnapshot
+                do {
+                    counterDoc = try transaction.getDocument(counterRef)
+                    reportDoc  = try transaction.getDocument(reportRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+
+                // Idempotency: document already committed on a previous attempt.
+                if reportDoc.exists { return nil }
+
+                let oldCount = counterDoc.data()?["count"] as? Int ?? 0
+                let newCount = oldCount + 1
+                transaction.setData(["count": newCount], forDocument: counterRef, merge: true)
+
+                var data: [String: Any] = [
+                    "id":             newCount,
+                    "clientReportId": clientReportId,
+                    "hazardType":     draft.hazardType,
+                    "date":           dateString,
+                    "createdAt":      createdAtMillis,
+                    "coordinate":     GeoPoint(latitude: lat, longitude: lng),
+                    "address":        resolvedAddress ?? "",
+                    "imageUrl":       imageUrl ?? "",
+                    "reportedBy":     reportedBy,
+                    "status":         "new",
+                    "queuedAt":       queuedAtMillis,
+                    "uploadAttempts": uploadAttempts,
+                ]
+                if let notes = draft.notes { data["description"] = notes }
+                if let rawLabel = draft.rawLabel { data["detectedLabel"] = rawLabel }
+                if let confidence = draft.confidence { data["detectionConfidence"] = confidence }
+                if let source = detectionSource { data["detectionSource"] = source }
+                if let bbox = draft.boundingBox {
+                    data["detectionBoundingBox"] = DetectionBoundingBox(from: bbox.cgRect).dictionary
+                }
+
+                transaction.setData(data, forDocument: reportRef)
+                return newCount
+            }
+            print("Firestore report committed: \(clientReportId)")
+        } catch {
+            print("Failed to commit pending report \(clientReportId): \(error.localizedDescription)")
+            throw error
+        }
+    }
 }
 
 @MainActor
@@ -233,7 +321,7 @@ final class AppController: ObservableObject {
     let authManager = AuthManager()
     let reportRepository = ReportRepository()
     let locationService = LocationManager()
-    private(set) lazy var reportCreationService: ReportCreationService = ReportCreationService(repository: reportRepository)
+    private(set) lazy var reportCreationService: ReportCreationService = ReportCreationService()
 
     private var cancellables = Set<AnyCancellable>()
     private var recentlySavedLabels: [String: Date] = [:]
@@ -242,6 +330,10 @@ final class AppController: ObservableObject {
 
     init() {
         bindManagers()
+        BackgroundUploadCoordinator.shared.start(
+            container: HazardModelContainer.shared.container,
+            repository: reportRepository
+        )
     }
 
     func signIn(email: String, password: String) {
@@ -292,7 +384,7 @@ final class AppController: ObservableObject {
         Task {
             do {
                 try await reportCreationService.submit(draft, userId: userId, userProfile: userProfile)
-                uploadMessage = "Report saved."
+                uploadMessage = "Report queued for upload."
             } catch {
                 uploadMessage = error.localizedDescription
             }
@@ -334,7 +426,7 @@ final class AppController: ObservableObject {
         Task {
             do {
                 try await reportCreationService.submit(draft, userId: userId, userProfile: userProfile)
-                uploadMessage = "Report saved."
+                uploadMessage = "Report queued for upload."
             } catch {
                 uploadMessage = error.localizedDescription
             }
@@ -378,11 +470,11 @@ final class AppController: ObservableObject {
             notes: "Live detection"
         )
 
-        liveMessage = "Saving \(trigger.label)..."
+        liveMessage = "Queueing \(trigger.label)..."
         Task {
             do {
                 try await reportCreationService.submit(draft, userId: userId, userProfile: userProfile)
-                liveMessage = "Saved \(trigger.label) report."
+                liveMessage = "Queued \(trigger.label) report."
             } catch {
                 recentlySavedLabels.removeValue(forKey: trigger.label)
                 liveMessage = error.localizedDescription

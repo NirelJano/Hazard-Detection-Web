@@ -1,53 +1,37 @@
-import CoreLocation
 import Foundation
-import UIKit
 
+/// Validates a `ReportDraft` and enqueues it as a `PendingReport` for
+/// durable background upload.  Returns as soon as the report is safely
+/// persisted locally — network delivery is handled asynchronously by
+/// `BackgroundUploadCoordinator`.
 @MainActor
 final class ReportCreationService {
-    private let repository: ReportRepository
+    private let coordinator: BackgroundUploadCoordinator
     private let validator: ReportValidationPolicy
-    private let imagePreparer: ReportImagePreparer
-    private let payloadBuilder: ReportPayloadBuilder
 
     init(
-        repository: ReportRepository,
-        validator: ReportValidationPolicy = ReportValidationPolicy(),
-        imagePreparer: ReportImagePreparer = ReportImagePreparer(),
-        payloadBuilder: ReportPayloadBuilder = ReportPayloadBuilder()
+        coordinator: BackgroundUploadCoordinator = .shared,
+        validator: ReportValidationPolicy = ReportValidationPolicy()
     ) {
-        self.repository = repository
+        self.coordinator = coordinator
         self.validator = validator
-        self.imagePreparer = imagePreparer
-        self.payloadBuilder = payloadBuilder
     }
 
     func submit(_ draft: ReportDraft, userId: String, userProfile: AppUserProfile?) async throws {
         try validator.validate(draft)
-        let preparedImage = try imagePreparer.prepareImage(for: draft)
-        let payload = try payloadBuilder.buildPayload(from: draft)
 
-        let resolvedAddress: String?
-        if let preresolved = draft.address {
-            resolvedAddress = preresolved
-        } else {
-            let coordinate = CLLocationCoordinate2D(latitude: payload.lat, longitude: payload.lng)
-            resolvedAddress = try? await GeocodingService.shared.reverseGeocode(coordinate: coordinate)
-        }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        let draftData = try encoder.encode(draft)
 
-        try await repository.addReport(
-            type: payload.type,
-            description: payload.description,
-            lat: payload.lat,
-            lng: payload.lng,
-            address: resolvedAddress,
-            image: preparedImage.uiImage,
-            userProfile: userProfile,
+        let reportedBy = userProfile?.displayName ?? userProfile?.email ?? "User"
+        let pending = PendingReport(
+            clientReportId: draft.id.uuidString,
+            draftData: draftData,
             userId: userId,
-            createdAtMillis: payload.createdAtMillis,
-            detectionLabel: payload.detectionLabel,
-            detectionConfidence: payload.detectionConfidence,
-            detectionSource: payload.detectionSource,
-            detectionBoundingBox: payload.detectionBoundingBox
+            reportedBy: reportedBy
         )
+
+        try coordinator.enqueue(pending)
     }
 }

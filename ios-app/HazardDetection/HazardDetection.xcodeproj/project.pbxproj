@@ -41,6 +41,11 @@
 		DA4A7841EC714119924DB69C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = BF9DCCFC79544A69AA90892D /* FirebaseCore */; };
 		5F0ED1E81112417D846E4E7F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 15D72536B0574943840FC467 /* FirebaseAuth */; };
 		7D828B249DB64E74B174CDC7 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = BD7B0F0379E0499EB6A99BAF /* FirebaseFirestore */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* Persistence/PendingReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Persistence/PendingReport.swift */; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* Persistence/HazardModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A7B8C9D0E1F2A3B4C5 /* Persistence/HazardModelContainer.swift */; };
+		E5F6A7B8C9D0E1F2A3B4C5D6 /* Networking/BackgroundUploadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A7B8C9D0E1F2A3B4C5D6E7 /* Networking/BackgroundUploadCoordinator.swift */; };
+		A7B8C9D0E1F2A3B4C5D6E7F8 /* Networking/ReachabilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8C9D0E1F2A3B4C5D6E7F8A9 /* Networking/ReachabilityMonitor.swift */; };
+		C9D0E1F2A3B4C5D6E7F8A9B0 /* Networking/RetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E1F2A3B4C5D6E7F8A9B0C1 /* Networking/RetryPolicy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -76,6 +81,11 @@
 		45B10CCEE99A4C5CAD801281 /* dashboard_map.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = dashboard_map.png; sourceTree = "<group>"; };
 		63647902074B4FCB881CC320 /* report_table.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = report_table.png; sourceTree = "<group>"; };
 		EE0F8165890F469D9B77C3D2 /* static_detection.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = static_detection.png; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* Persistence/PendingReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence/PendingReport.swift; sourceTree = "<group>"; };
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* Persistence/HazardModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence/HazardModelContainer.swift; sourceTree = "<group>"; };
+		F6A7B8C9D0E1F2A3B4C5D6E7 /* Networking/BackgroundUploadCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking/BackgroundUploadCoordinator.swift; sourceTree = "<group>"; };
+		B8C9D0E1F2A3B4C5D6E7F8A9 /* Networking/ReachabilityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking/ReachabilityMonitor.swift; sourceTree = "<group>"; };
+		D0E1F2A3B4C5D6E7F8A9B0C1 /* Networking/RetryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Networking/RetryPolicy.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +145,11 @@
 				E9A26898786E447390540035 /* Reporting/ReportImagePreparer.swift */,
 				6AF6B9D41FD0420191932C34 /* Reporting/ReportPayloadBuilder.swift */,
 				D3041A868B934FD19F51CDDA /* Reporting/ReportCreationService.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* Persistence/PendingReport.swift */,
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* Persistence/HazardModelContainer.swift */,
+				F6A7B8C9D0E1F2A3B4C5D6E7 /* Networking/BackgroundUploadCoordinator.swift */,
+				B8C9D0E1F2A3B4C5D6E7F8A9 /* Networking/ReachabilityMonitor.swift */,
+				D0E1F2A3B4C5D6E7F8A9B0C1 /* Networking/RetryPolicy.swift */,
 				E015A05FD8BC48D3A481C3D9 /* Assets.xcassets */,
 				F90B916A5B31425AA498C6CB /* GoogleService-Info.plist */,
 				BB5919F6BB7842C3BDAC3380 /* best.mlpackage */,
@@ -248,6 +263,11 @@
 				2CC4BD3FF4ED4A7BAE2EE09E /* static_detection.png in Sources */,
 				2894A6DC4A214ACB8ED98E2E /* static_detection.png in Sources */,
 				3F8689E32D9D48D19C6D480B /* static_detection.png in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* Persistence/PendingReport.swift in Sources */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* Persistence/HazardModelContainer.swift in Sources */,
+				E5F6A7B8C9D0E1F2A3B4C5D6 /* Networking/BackgroundUploadCoordinator.swift in Sources */,
+				A7B8C9D0E1F2A3B4C5D6E7F8 /* Networking/ReachabilityMonitor.swift in Sources */,
+				C9D0E1F2A3B4C5D6E7F8A9B0 /* Networking/RetryPolicy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
