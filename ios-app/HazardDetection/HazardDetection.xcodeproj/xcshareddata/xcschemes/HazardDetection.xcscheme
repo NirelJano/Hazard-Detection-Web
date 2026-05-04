@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeCheck = "1500"
-   LastUpgradeVersion = "2640"
-   version = "1.8">
+   version = "1.7">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
@@ -15,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0515FAA428BC4411B16B20D1"
+               BlueprintIdentifier = "F0C0FF21525A4D26B071623B"
                BuildableName = "HazardDetection.app"
                BlueprintName = "HazardDetection"
                ReferencedContainer = "container:HazardDetection.xcodeproj">
@@ -45,7 +44,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0515FAA428BC4411B16B20D1"
+            BlueprintIdentifier = "F0C0FF21525A4D26B071623B"
             BuildableName = "HazardDetection.app"
             BlueprintName = "HazardDetection"
             ReferencedContainer = "container:HazardDetection.xcodeproj">
@@ -62,7 +61,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "0515FAA428BC4411B16B20D1"
+            BlueprintIdentifier = "F0C0FF21525A4D26B071623B"
             BuildableName = "HazardDetection.app"
             BlueprintName = "HazardDetection"
             ReferencedContainer = "container:HazardDetection.xcodeproj">

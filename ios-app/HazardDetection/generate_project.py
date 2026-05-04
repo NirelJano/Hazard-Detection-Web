@@ -94,6 +94,17 @@ IDs = {
     "bfPng2":           uid(),
     "filePng3":         uid(),
     "bfPng3":           uid(),
+    # Reporting module
+    "fileReportDraft":              uid(),
+    "bfReportDraft":                uid(),
+    "fileReportValidationPolicy":   uid(),
+    "bfReportValidationPolicy":     uid(),
+    "fileReportImagePreparer":      uid(),
+    "bfReportImagePreparer":        uid(),
+    "fileReportPayloadBuilder":     uid(),
+    "bfReportPayloadBuilder":       uid(),
+    "fileReportCreationService":    uid(),
+    "bfReportCreationService":      uid(),
 }
 
 SWIFT_FILES = [
@@ -116,6 +127,11 @@ SWIFT_FILES = [
     ("SettingsView.swift",       "fileSettings",       "bfSettings"),
     ("UIComponents.swift",       "fileUIComponents",   "bfUIComponents"),
     ("UploadReportView.swift",   "fileUpload",         "bfUpload"),
+    ("Reporting/ReportDraft.swift",             "fileReportDraft",            "bfReportDraft"),
+    ("Reporting/ReportValidationPolicy.swift",  "fileReportValidationPolicy", "bfReportValidationPolicy"),
+    ("Reporting/ReportImagePreparer.swift",     "fileReportImagePreparer",    "bfReportImagePreparer"),
+    ("Reporting/ReportPayloadBuilder.swift",    "fileReportPayloadBuilder",   "bfReportPayloadBuilder"),
+    ("Reporting/ReportCreationService.swift",   "fileReportCreationService",  "bfReportCreationService"),
 ]
 
 PNG_FILES = [
