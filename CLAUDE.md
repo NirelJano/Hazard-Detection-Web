@@ -35,6 +35,8 @@ docker run -p 3000:3000 hazard-detection
 
 **Service Worker** — `/js/worker.js` provides offline caching. Cache headers are tuned in `firebase.json`: ML models get 1-year immutable caching; `env.js` and the service worker get `no-cache`.
 
+**Native iOS app** — A separate native SwiftUI app lives in `/ios-app/HazardDetection/`. It shares the Firestore `reports` schema and Cloudinary upload preset with the web app, but runs Core ML (compiled `best.mlmodelc`) on-device via Vision/AVFoundation rather than TensorFlow.js. When changing the Firestore schema or Cloudinary upload contract, update both clients. iOS-specific guidance lives in `/ios-app/HazardDetection/CLAUDE.md`; the in-progress live-detection + reports upgrade is tracked in `/ios-app/HazardDetection/docs/UPGRADE_ROADMAP.md`.
+
 ## Environment Variables
 
 Requires a `.env` file at the project root (used by `server.js`):

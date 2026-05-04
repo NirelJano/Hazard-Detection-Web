@@ -136,9 +136,9 @@ struct UploadReportView: View {
             .ignoresSafeArea()
         }
         .sheet(isPresented: $showingScanner) {
-            HazardScannerView { text in
+            HazardScannerView(onTextSelected: { text in
                 scannedDescription = text
-            }
+            })
             .onAppear { NotificationCenter.default.post(name: .stopLiveCameraSession, object: nil) }
             .onDisappear { NotificationCenter.default.post(name: .startLiveCameraSession, object: nil) }
             .ignoresSafeArea()
@@ -429,69 +429,6 @@ enum ImageGPSExtractor {
     }
 }
 
-struct HazardScannerView: View {
-    let onScan: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var scannedText: String = ""
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                Color.appDark950.ignoresSafeArea()
-                
-                VStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Describe the Hazard")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("Enter details about what you observed")
-                            .font(.system(size: 14))
-                            .foregroundColor(.appDark400)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    TextEditor(text: $scannedText)
-                        .font(.system(size: 15))
-                        .foregroundColor(.white)
-                        .scrollContentBackground(.hidden)
-                        .padding(14)
-                        .background(Color.appDark900)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                        )
-                        .frame(height: 200)
-                    
-                    Button {
-                        if !scannedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            onScan(scannedText)
-                            dismiss()
-                        }
-                    } label: {
-                        Text("Add Description")
-                            .primaryButtonStyle()
-                    }
-                    .disabled(scannedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .opacity(scannedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
-                    
-                    Spacer()
-                }
-                .padding(24)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.appPrimary)
-                }
-            }
-        }
-    }
-}
-
 private extension UIImage {
     func normalizedOrientation() -> UIImage {
         guard imageOrientation != .up else { return self }
@@ -501,4 +438,3 @@ private extension UIImage {
         }
     }
 }
-

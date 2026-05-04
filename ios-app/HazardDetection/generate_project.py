@@ -1,383 +1,324 @@
 #!/usr/bin/env python3
 """
-Generates a minimal HazardDetection.xcodeproj from scratch.
-Run from the HazardDetection/ folder:
-    python3 generate_project.py
+Generates a minimal HazardDetection.xcodeproj from the files on disk.
+Run from anywhere:
+    python3 ios-app/HazardDetection/generate_project.py
 """
 
-import os, uuid, pathlib
+import pathlib
+import uuid
+
+
+PROJECT_NAME = "HazardDetection"
+TEAM_ID = "Z3XLCBKN9K"
+BUNDLE_ID = "com.hazarddetection.app-com.hazarddetection.app-"
+FIREBASE_VERSION = "12.12.1"
+
 
 def uid():
     return uuid.uuid4().hex[:24].upper()
 
-# --- Fixed UUIDs so the project is stable ---
-IDs = {
-    "project":          uid(),
-    "mainGroup":        uid(),
-    "sourcesGroup":     uid(),
-    "productsGroup":    uid(),
-    "target":           uid(),
-    "buildConfigDebug": uid(),
-    "buildConfigRel":   uid(),
-    "projConfigDebug":  uid(),
-    "projConfigRel":    uid(),
-    "configListProj":   uid(),
-    "configListTarget": uid(),
-    "sourcesBuildPhase":uid(),
-    "resourcesBuildPhase":uid(),
-    "frameworksBuildPhase":uid(),
-    # Swift source files
-    "fileApp":          uid(),
-    "fileContent":      uid(),
-    "fileCameraManager":uid(),
-    "fileCameraView":   uid(),
-    "fileDesign":       uid(),
-    "fileLiveDetection":uid(),
-    "fileBackend":       uid(),
-    "fileAuth":          uid(),
-    "fileAuthView":      uid(),
-    "fileCloudinary":    uid(),
-    "fileDashboard":     uid(),
-    "fileGeocoding":     uid(),
-    "fileLocation":      uid(),
-    "fileMainTab":       uid(),
-    "fileModels":        uid(),
-    "fileReportDetail":  uid(),
-    "fileSettings":      uid(),
-    "fileUIComponents":  uid(),
-    "fileUpload":        uid(),
-    # build file refs
-    "bfApp":            uid(),
-    "bfContent":        uid(),
-    "bfCameraManager":  uid(),
-    "bfCameraView":     uid(),
-    "bfDesign":         uid(),
-    "bfLiveDetection":  uid(),
-    "bfBackend":         uid(),
-    "bfAuth":            uid(),
-    "bfAuthView":        uid(),
-    "bfCloudinary":      uid(),
-    "bfDashboard":       uid(),
-    "bfGeocoding":       uid(),
-    "bfLocation":        uid(),
-    "bfMainTab":         uid(),
-    "bfModels":          uid(),
-    "bfReportDetail":    uid(),
-    "bfSettings":        uid(),
-    "bfUIComponents":    uid(),
-    "bfUpload":          uid(),
-    # product
-    "productFile":      uid(),
-    # CoreML Model
-    "fileModel":        uid(),
-    "bfModel":          uid(),
-    "fileModelC":       uid(),
-    "bfModelC":         uid(),
-    # Assets
-    "fileAssets":       uid(),
-    "bfAssets":         uid(),
-    # Swift Packages
-    "pkgFirebase":      uid(),
-    "prodCore":         uid(),
-    "prodAuth":         uid(),
-    "prodFirestore":    uid(),
-    "bfProdCore":       uid(),
-    "bfProdAuth":       uid(),
-    "bfProdFirestore":  uid(),
-    # Firebase
-    "fileGoogleService": uid(),
-    "bfGoogleService":   uid(),
-    # Images
-    "filePng1":         uid(),
-    "bfPng1":           uid(),
-    "filePng2":         uid(),
-    "bfPng2":           uid(),
-    "filePng3":         uid(),
-    "bfPng3":           uid(),
-}
 
-SWIFT_FILES = [
-    ("HazardDetectionApp.swift", "fileApp",           "bfApp"),
-    ("ContentView.swift",        "fileContent",        "bfContent"),
-    ("CameraManager.swift",      "fileCameraManager",  "bfCameraManager"),
-    ("CameraView.swift",         "fileCameraView",     "bfCameraView"),
-    ("DesignSystem.swift",       "fileDesign",         "bfDesign"),
-    ("LiveDetectionView.swift",  "fileLiveDetection",  "bfLiveDetection"),
-    ("BackendServices.swift",    "fileBackend",        "bfBackend"),
-    ("AuthManager.swift",        "fileAuth",           "bfAuth"),
-    ("AuthenticationView.swift", "fileAuthView",       "bfAuthView"),
-    ("CloudinaryService.swift",  "fileCloudinary",     "bfCloudinary"),
-    ("DashboardView.swift",      "fileDashboard",      "bfDashboard"),
-    ("GeocodingService.swift",   "fileGeocoding",      "bfGeocoding"),
-    ("LocationManager.swift",    "fileLocation",       "bfLocation"),
-    ("MainTabView.swift",        "fileMainTab",        "bfMainTab"),
-    ("Models.swift",             "fileModels",         "bfModels"),
-    ("ReportDetailView.swift",   "fileReportDetail",   "bfReportDetail"),
-    ("SettingsView.swift",       "fileSettings",       "bfSettings"),
-    ("UIComponents.swift",       "fileUIComponents",   "bfUIComponents"),
-    ("UploadReportView.swift",   "fileUpload",         "bfUpload"),
-]
+def q(value):
+    return '"' + value.replace('"', '\\"') + '"'
 
-PNG_FILES = [
-    ("dashboard_map.png",     "filePng1", "bfPng1"),
-    ("report_table.png",      "filePng2", "bfPng2"),
-    ("static_detection.png",  "filePng3", "bfPng3"),
-]
 
-def pbxproj():
-    I = IDs
-    file_refs = ""
-    for fname, fid, _ in SWIFT_FILES:
-        file_refs += f"""\t\t{I[fid]} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {fname}; sourceTree = "<group>"; }};\n"""
-    
-    # Add CoreML model reference
-    file_refs += f"""\t\t{I['fileModel']} /* best.mlpackage */ = {{isa = PBXFileReference; lastKnownFileType = wrapper.mlpackage; path = best.mlpackage; sourceTree = "<group>"; }};\n"""
-    file_refs += f"""\t\t{I['fileModelC']} /* best.mlmodelc */ = {{isa = PBXFileReference; lastKnownFileType = wrapper.pbobjc; path = best.mlmodelc; sourceTree = "<group>"; }};\n"""
-    
-    # Add Assets reference
-    file_refs += f"""\t\t{I['fileAssets']} /* Assets.xcassets */ = {{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; }};\n"""
-    file_refs += f"""\t\t{I['fileGoogleService']} /* GoogleService-Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; }};\n"""
+def swift_files(base):
+    source_root = base / PROJECT_NAME
+    return sorted(
+        path.relative_to(source_root).as_posix()
+        for path in source_root.rglob("*.swift")
+    )
 
-    for fname, fid, _ in PNG_FILES:
-        file_refs += f"""\t\t{I[fid]} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = image.png; path = {fname}; sourceTree = "<group>"; }};\n"""
 
-    build_files = ""
-    for fname, fid, bfid in SWIFT_FILES:
-        build_files += f"\t\t{I[bfid]} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {I[fid]} /* {fname} */; }};\n"
-    
-    # Add CoreML model to build files
-    build_files += f"\t\t{I['bfModel']} /* best.mlpackage in Resources */ = {{isa = PBXBuildFile; fileRef = {I['fileModel']} /* best.mlpackage */; }};\n"
-    build_files += f"\t\t{I['bfModelC']} /* best.mlmodelc in Resources */ = {{isa = PBXBuildFile; fileRef = {I['fileModelC']} /* best.mlmodelc */; }};\n"
-    
-    # Add Assets to build files
-    build_files += f"""\t\t{I['bfAssets']} /* Assets.xcassets in Resources */ = {{isa = PBXBuildFile; fileRef = {I['fileAssets']} /* Assets.xcassets */; }};\n"""
-    build_files += f"""\t\t{I['bfGoogleService']} /* GoogleService-Info.plist in Resources */ = {{isa = PBXBuildFile; fileRef = {I['fileGoogleService']} /* GoogleService-Info.plist */; }};\n"""
+def pbxproj(files):
+    ids = {
+        "project": uid(),
+        "main_group": uid(),
+        "sources_group": uid(),
+        "products_group": uid(),
+        "target": uid(),
+        "product_file": uid(),
+        "sources_phase": uid(),
+        "resources_phase": uid(),
+        "frameworks_phase": uid(),
+        "config_list_project": uid(),
+        "config_list_target": uid(),
+        "debug_project": uid(),
+        "release_project": uid(),
+        "debug_target": uid(),
+        "release_target": uid(),
+        "pkg_firebase": uid(),
+        "prod_core": uid(),
+        "prod_auth": uid(),
+        "prod_firestore": uid(),
+        "bf_core": uid(),
+        "bf_auth": uid(),
+        "bf_firestore": uid(),
+    }
 
-    for fname, fid, bfid in PNG_FILES:
-        build_files += f"\t\t{I[bfid]} /* {fname} in Resources */ = {{isa = PBXBuildFile; fileRef = {I[fid]} /* {fname} */; }};\n"
+    source_refs = {}
+    source_builds = {}
+    for file in files:
+        source_refs[file] = uid()
+        source_builds[file] = uid()
 
-    build_files += f"\t\t{I['bfProdCore']} /* FirebaseCore in Frameworks */ = {{isa = PBXBuildFile; productRef = {I['prodCore']} /* FirebaseCore */; }};\n"
-    build_files += f"\t\t{I['bfProdAuth']} /* FirebaseAuth in Frameworks */ = {{isa = PBXBuildFile; productRef = {I['prodAuth']} /* FirebaseAuth */; }};\n"
-    build_files += f"\t\t{I['bfProdFirestore']} /* FirebaseFirestore in Frameworks */ = {{isa = PBXBuildFile; productRef = {I['prodFirestore']} /* FirebaseFirestore */; }};\n"
+    resources = [
+        ("Assets.xcassets", "folder.assetcatalog"),
+        ("GoogleService-Info.plist", "text.plist.xml"),
+        ("best.mlpackage", "wrapper.mlpackage"),
+        ("best.mlmodelc", "wrapper.pbobjc"),
+        ("dashboard_map.png", "image.png"),
+        ("report_table.png", "image.png"),
+        ("static_detection.png", "image.png"),
+    ]
+    resource_refs = {name: uid() for name, _ in resources}
+    resource_builds = {name: uid() for name, _ in resources}
 
-    sources_children = "\n".join(f"\t\t\t\t{I[fid]} /* {fname} */," for fname,fid,_ in SWIFT_FILES)
-    sources_build_files = "\n".join(f"\t\t\t\t{I[bfid]} /* {fname} in Sources */," for _,_,bfid in SWIFT_FILES)
+    build_files = []
+    for file in files:
+        build_files.append(
+            f"\t\t{source_builds[file]} /* {file} in Sources */ = "
+            f"{{isa = PBXBuildFile; fileRef = {source_refs[file]} /* {file} */; }};"
+        )
+    for name, _ in resources:
+        build_files.append(
+            f"\t\t{resource_builds[name]} /* {name} in Resources */ = "
+            f"{{isa = PBXBuildFile; fileRef = {resource_refs[name]} /* {name} */; }};"
+        )
+    build_files.extend([
+        f"\t\t{ids['bf_core']} /* FirebaseCore in Frameworks */ = {{isa = PBXBuildFile; productRef = {ids['prod_core']} /* FirebaseCore */; }};",
+        f"\t\t{ids['bf_auth']} /* FirebaseAuth in Frameworks */ = {{isa = PBXBuildFile; productRef = {ids['prod_auth']} /* FirebaseAuth */; }};",
+        f"\t\t{ids['bf_firestore']} /* FirebaseFirestore in Frameworks */ = {{isa = PBXBuildFile; productRef = {ids['prod_firestore']} /* FirebaseFirestore */; }};",
+    ])
 
-    return f"""// !$*UTF8*$!
+    file_refs = [
+        f"\t\t{ids['product_file']} /* {PROJECT_NAME}.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = {PROJECT_NAME}.app; sourceTree = BUILT_PRODUCTS_DIR; }};"
+    ]
+    for file in files:
+        file_refs.append(
+            f"\t\t{source_refs[file]} /* {file} */ = "
+            f"{{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {q(file)}; sourceTree = \"<group>\"; }};"
+        )
+    for name, file_type in resources:
+        file_refs.append(
+            f"\t\t{resource_refs[name]} /* {name} */ = "
+            f"{{isa = PBXFileReference; lastKnownFileType = {file_type}; path = {q(name)}; sourceTree = \"<group>\"; }};"
+        )
+
+    source_children = "\n".join(
+        f"\t\t\t\t{source_refs[file]} /* {file} */," for file in files
+    )
+    resource_children = "\n".join(
+        f"\t\t\t\t{resource_refs[name]} /* {name} */," for name, _ in resources
+    )
+    source_phase_files = "\n".join(
+        f"\t\t\t\t{source_builds[file]} /* {file} in Sources */," for file in files
+    )
+    resource_phase_files = "\n".join(
+        f"\t\t\t\t{resource_builds[name]} /* {name} in Resources */," for name, _ in resources
+    )
+
+    project_text = f"""// !$*UTF8*$!
 {{
 \tarchiveVersion = 1;
-\tclasses = {{
-\t}};
+\tclasses = {{}};
 \tobjectVersion = 56;
 \tobjects = {{
 
 /* Begin PBXBuildFile section */
-{build_files}/* End PBXBuildFile section */
+{chr(10).join(build_files)}
+/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-\t\t{I['productFile']} /* HazardDetection.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HazardDetection.app; sourceTree = BUILT_PRODUCTS_DIR; }};
-{file_refs}/* End PBXFileReference section */
+{chr(10).join(file_refs)}
+/* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-\t\t{I['frameworksBuildPhase']} /* Frameworks */ = {{
+\t\t{ids['frameworks_phase']} /* Frameworks */ = {{
 \t\t\tisa = PBXFrameworksBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
-\t\t\t\t{I['bfProdCore']} /* FirebaseCore in Frameworks */,
-\t\t\t\t{I['bfProdAuth']} /* FirebaseAuth in Frameworks */,
-\t\t\t\t{I['bfProdFirestore']} /* FirebaseFirestore in Frameworks */,
+\t\t\t\t{ids['bf_core']} /* FirebaseCore in Frameworks */,
+\t\t\t\t{ids['bf_auth']} /* FirebaseAuth in Frameworks */,
+\t\t\t\t{ids['bf_firestore']} /* FirebaseFirestore in Frameworks */,
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-\t\t{I['mainGroup']} = {{
+\t\t{ids['main_group']} = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
-\t\t\t\t{I['sourcesGroup']} /* HazardDetection */,
-\t\t\t\t{I['productsGroup']} /* Products */,
+\t\t\t\t{ids['sources_group']} /* {PROJECT_NAME} */,
+\t\t\t\t{ids['products_group']} /* Products */,
 \t\t\t);
-\t\t\tsourceTree = "<group>";
+\t\t\tsourceTree = \"<group>\";
 \t\t}};
-\t\t{I['productsGroup']} /* Products */ = {{
+\t\t{ids['products_group']} /* Products */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
-\t\t\t\t{I['productFile']} /* HazardDetection.app */,
+\t\t\t\t{ids['product_file']} /* {PROJECT_NAME}.app */,
 \t\t\t);
 \t\t\tname = Products;
-\t\t\tsourceTree = "<group>";
+\t\t\tsourceTree = \"<group>\";
 \t\t}};
-\t\t{I['sourcesGroup']} /* HazardDetection */ = {{
+\t\t{ids['sources_group']} /* {PROJECT_NAME} */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
-{sources_children}
-\t\t\t\t{I['fileAssets']} /* Assets.xcassets */,
-\t\t\t\t{I['fileGoogleService']} /* GoogleService-Info.plist */,
-\t\t\t\t{I['fileModel']} /* best.mlpackage */,
-\t\t\t\t{I['fileModelC']} /* best.mlmodelc */,
-\t\t\t\t{I['filePng1']} /* dashboard_map.png */,
-\t\t\t\t{I['filePng2']} /* report_table.png */,
-\t\t\t\t{I['filePng3']} /* static_detection.png */,
+{source_children}
+{resource_children}
 \t\t\t);
-\t\t\tpath = HazardDetection;
-\t\t\tsourceTree = "<group>";
+\t\t\tpath = {PROJECT_NAME};
+\t\t\tsourceTree = \"<group>\";
 \t\t}};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-\t\t{I['target']} /* HazardDetection */ = {{
+\t\t{ids['target']} /* {PROJECT_NAME} */ = {{
 \t\t\tisa = PBXNativeTarget;
-\t\t\tbuildConfigurationList = {I['configListTarget']} /* Build configuration list for PBXNativeTarget "HazardDetection" */;
+\t\t\tbuildConfigurationList = {ids['config_list_target']} /* Build configuration list for PBXNativeTarget \"{PROJECT_NAME}\" */;
 \t\t\tbuildPhases = (
-\t\t\t\t{I['sourcesBuildPhase']} /* Sources */,
-\t\t\t\t{I['frameworksBuildPhase']} /* Frameworks */,
-\t\t\t\t{I['resourcesBuildPhase']} /* Resources */,
+\t\t\t\t{ids['sources_phase']} /* Sources */,
+\t\t\t\t{ids['frameworks_phase']} /* Frameworks */,
+\t\t\t\t{ids['resources_phase']} /* Resources */,
 \t\t\t);
-\t\t\tbuildRules = (
-\t\t\t);
-\t\t\tdependencies = (
-\t\t\t);
-\t\t\tname = HazardDetection;
+\t\t\tbuildRules = ();
+\t\t\tdependencies = ();
+\t\t\tname = {PROJECT_NAME};
 \t\t\tpackageProductDependencies = (
-\t\t\t\t{I['prodCore']} /* FirebaseCore */,
-\t\t\t\t{I['prodAuth']} /* FirebaseAuth */,
-\t\t\t\t{I['prodFirestore']} /* FirebaseFirestore */,
+\t\t\t\t{ids['prod_core']} /* FirebaseCore */,
+\t\t\t\t{ids['prod_auth']} /* FirebaseAuth */,
+\t\t\t\t{ids['prod_firestore']} /* FirebaseFirestore */,
 \t\t\t);
-\t\t\tproductName = HazardDetection;
-\t\t\tproductReference = {I['productFile']} /* HazardDetection.app */;
-\t\t\tproductType = "com.apple.product-type.application";
+\t\t\tproductName = {PROJECT_NAME};
+\t\t\tproductReference = {ids['product_file']} /* {PROJECT_NAME}.app */;
+\t\t\tproductType = \"com.apple.product-type.application\";
 \t\t}};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-\t\t{I['project']} /* Project object */ = {{
+\t\t{ids['project']} /* Project object */ = {{
 \t\t\tisa = PBXProject;
 \t\t\tattributes = {{
 \t\t\t\tBuildIndependentTargetsInParallel = 1;
 \t\t\t\tLastSwiftUpdateCheck = 1500;
 \t\t\t\tLastUpgradeCheck = 1500;
 \t\t\t}};
-\t\t\tbuildConfigurationList = {I['configListProj']} /* Build configuration list for PBXProject "HazardDetection" */;
-\t\t\tcompatibilityVersion = "Xcode 14.0";
+\t\t\tbuildConfigurationList = {ids['config_list_project']} /* Build configuration list for PBXProject \"{PROJECT_NAME}\" */;
+\t\t\tcompatibilityVersion = \"Xcode 14.0\";
 \t\t\tdevelopmentRegion = en;
 \t\t\thasScannedForEncodings = 0;
-\t\t\tknownRegions = (
-\t\t\t\ten,
-\t\t\t\tBase,
-\t\t\t);
-\t\t\tmainGroup = {I['mainGroup']};
+\t\t\tknownRegions = (en, Base);
+\t\t\tmainGroup = {ids['main_group']};
 \t\t\tpackageReferences = (
-\t\t\t\t{I['pkgFirebase']} /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+\t\t\t\t{ids['pkg_firebase']} /* XCRemoteSwiftPackageReference \"firebase-ios-sdk\" */,
 \t\t\t);
-\t\t\tproductRefGroup = {I['productsGroup']} /* Products */;
-\t\t\tprojectDirPath = "";
-\t\t\tprojectRoot = "";
+\t\t\tproductRefGroup = {ids['products_group']} /* Products */;
+\t\t\tprojectDirPath = \"\";
+\t\t\tprojectRoot = \"\";
 \t\t\ttargets = (
-\t\t\t\t{I['target']} /* HazardDetection */,
+\t\t\t\t{ids['target']} /* {PROJECT_NAME} */,
 \t\t\t);
 \t\t}};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-\t\t{I['resourcesBuildPhase']} /* Resources */ = {{
+\t\t{ids['resources_phase']} /* Resources */ = {{
 \t\t\tisa = PBXResourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
-\t\t\t\t{I['bfAssets']} /* Assets.xcassets in Resources */,
-\t\t\t\t{I['bfGoogleService']} /* GoogleService-Info.plist in Resources */,
-\t\t\t\t{I['bfModel']} /* best.mlpackage in Resources */,
-\t\t\t\t{I['bfModelC']} /* best.mlmodelc in Resources */,
-\t\t\t\t{I['bfPng1']} /* dashboard_map.png in Resources */,
-\t\t\t\t{I['bfPng2']} /* report_table.png in Resources */,
-\t\t\t\t{I['bfPng3']} /* static_detection.png in Resources */,
+{resource_phase_files}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-\t\t{I['sourcesBuildPhase']} /* Sources */ = {{
+\t\t{ids['sources_phase']} /* Sources */ = {{
 \t\t\tisa = PBXSourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
-{sources_build_files}
+{source_phase_files}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-\t\t{I['pkgFirebase']} /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {{
+\t\t{ids['pkg_firebase']} /* XCRemoteSwiftPackageReference \"firebase-ios-sdk\" */ = {{
 \t\t\tisa = XCRemoteSwiftPackageReference;
-\t\t\trepositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+\t\t\trepositoryURL = \"https://github.com/firebase/firebase-ios-sdk\";
 \t\t\trequirement = {{
 \t\t\t\tkind = upToNextMajorVersion;
-\t\t\t\tminimumVersion = 12.12.1;
+\t\t\t\tminimumVersion = {FIREBASE_VERSION};
 \t\t\t}};
 \t\t}};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-\t\t{I['prodCore']} /* FirebaseCore */ = {{
-\t\t\tisa = XCSwiftPackageProductDependency;
-\t\t\tpackage = {I['pkgFirebase']} /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-\t\t\tproductName = FirebaseCore;
-\t\t}};
-\t\t{I['prodAuth']} /* FirebaseAuth */ = {{
-\t\t\tisa = XCSwiftPackageProductDependency;
-\t\t\tpackage = {I['pkgFirebase']} /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-\t\t\tproductName = FirebaseAuth;
-\t\t}};
-\t\t{I['prodFirestore']} /* FirebaseFirestore */ = {{
-\t\t\tisa = XCSwiftPackageProductDependency;
-\t\t\tpackage = {I['pkgFirebase']} /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-\t\t\tproductName = FirebaseFirestore;
-\t\t}};
+\t\t{ids['prod_core']} /* FirebaseCore */ = {{isa = XCSwiftPackageProductDependency; package = {ids['pkg_firebase']} /* XCRemoteSwiftPackageReference \"firebase-ios-sdk\" */; productName = FirebaseCore; }};
+\t\t{ids['prod_auth']} /* FirebaseAuth */ = {{isa = XCSwiftPackageProductDependency; package = {ids['pkg_firebase']} /* XCRemoteSwiftPackageReference \"firebase-ios-sdk\" */; productName = FirebaseAuth; }};
+\t\t{ids['prod_firestore']} /* FirebaseFirestore */ = {{isa = XCSwiftPackageProductDependency; package = {ids['pkg_firebase']} /* XCRemoteSwiftPackageReference \"firebase-ios-sdk\" */; productName = FirebaseFirestore; }};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
-\t\t{I['buildConfigDebug']} /* Debug */ = {{
+\t\t{ids['debug_target']} /* Debug */ = {{
 \t\t\tisa = XCBuildConfiguration;
+\t\t\tbaseConfigurationReference = 8BBED19A2F9E296F007A7818 /* Config.xcconfig */;
 \t\t\tbuildSettings = {{
-\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-\t\t\t\tASSET_SYMBOL_GENERATION = NO;
 \t\t\t\tALWAYS_SEARCH_USER_PATHS = NO;
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 \t\t\t\tASSET_CATALOG_COMPILER_OPTIMIZATION = space;
+\t\t\t\tASSET_SYMBOL_GENERATION = NO;
 \t\t\t\tCLANG_ENABLE_MODULES = YES;
 \t\t\t\tCLANG_ENABLE_OBJC_ARC = YES;
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
-\t\t\t\tINFOPLIST_FILE = HazardDetection/Info.plist;
+\t\t\t\tDEVELOPMENT_TEAM = {TEAM_ID};
+\t\t\t\tINFOPLIST_FILE = {PROJECT_NAME}/Info.plist;
+\t\t\t\tINFOPLIST_KEY_CFBundleDisplayName = {PROJECT_NAME};
 \t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 17.0;
-\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = "com.raz0125.hazarddetection.app";
-\t\t\t\tDEVELOPMENT_TEAM = 8NX9TVG3J6;
-\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {q(BUNDLE_ID)};
+\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";
+\t\t\t\tSUPPORTED_PLATFORMS = \"iphoneos iphonesimulator\";
+\t\t\t\tSUPPORTS_MACCATALYST = NO;
+\t\t\t\tSUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+\t\t\t\tSUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 \t\t\t\tSWIFT_VERSION = 5.9;
-\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";
+\t\t\t\tTARGETED_DEVICE_FAMILY = 1;
 \t\t\t}};
 \t\t\tname = Debug;
 \t\t}};
-\t\t{I['buildConfigRel']} /* Release */ = {{
+\t\t{ids['release_target']} /* Release */ = {{
 \t\t\tisa = XCBuildConfiguration;
+\t\t\tbaseConfigurationReference = 8BBED19A2F9E296F007A7818 /* Config.xcconfig */;
 \t\t\tbuildSettings = {{
-\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-\t\t\t\tASSET_SYMBOL_GENERATION = NO;
 \t\t\t\tALWAYS_SEARCH_USER_PATHS = NO;
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 \t\t\t\tASSET_CATALOG_COMPILER_OPTIMIZATION = space;
+\t\t\t\tASSET_SYMBOL_GENERATION = NO;
 \t\t\t\tCLANG_ENABLE_MODULES = YES;
 \t\t\t\tCLANG_ENABLE_OBJC_ARC = YES;
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
-\t\t\t\tINFOPLIST_FILE = HazardDetection/Info.plist;
+\t\t\t\tDEVELOPMENT_TEAM = {TEAM_ID};
+\t\t\t\tINFOPLIST_FILE = {PROJECT_NAME}/Info.plist;
+\t\t\t\tINFOPLIST_KEY_CFBundleDisplayName = {PROJECT_NAME};
 \t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 17.0;
-\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = "com.raz0125.hazarddetection.app";
-\t\t\t\tDEVELOPMENT_TEAM = 8NX9TVG3J6;
-\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {q(BUNDLE_ID)};
+\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";
+\t\t\t\tSUPPORTED_PLATFORMS = \"iphoneos iphonesimulator\";
+\t\t\t\tSUPPORTS_MACCATALYST = NO;
+\t\t\t\tSUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+\t\t\t\tSUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+\t\t\t\tSWIFT_COMPILATION_MODE = wholemodule;
 \t\t\t\tSWIFT_VERSION = 5.9;
-\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";
+\t\t\t\tTARGETED_DEVICE_FAMILY = 1;
+\t\t\t\tVALIDATE_PRODUCT = YES;
 \t\t\t}};
 \t\t\tname = Release;
 \t\t}};
-\t\t{I['projConfigDebug']} /* Debug */ = {{
+\t\t{ids['debug_project']} /* Debug */ = {{
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
 \t\t\t\tALWAYS_SEARCH_USER_PATHS = NO;
@@ -386,7 +327,7 @@ def pbxproj():
 \t\t\t}};
 \t\t\tname = Debug;
 \t\t}};
-\t\t{I['projConfigRel']} /* Release */ = {{
+\t\t{ids['release_project']} /* Release */ = {{
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
 \t\t\t\tALWAYS_SEARCH_USER_PATHS = NO;
@@ -399,20 +340,20 @@ def pbxproj():
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-\t\t{I['configListProj']} /* Build configuration list for PBXProject "HazardDetection" */ = {{
+\t\t{ids['config_list_project']} /* Build configuration list for PBXProject \"{PROJECT_NAME}\" */ = {{
 \t\t\tisa = XCConfigurationList;
 \t\t\tbuildConfigurations = (
-\t\t\t\t{I['projConfigDebug']} /* Debug */,
-\t\t\t\t{I['projConfigRel']} /* Release */,
+\t\t\t\t{ids['debug_project']} /* Debug */,
+\t\t\t\t{ids['release_project']} /* Release */,
 \t\t\t);
 \t\t\tdefaultConfigurationIsVisible = 0;
 \t\t\tdefaultConfigurationName = Release;
 \t\t}};
-\t\t{I['configListTarget']} /* Build configuration list for PBXNativeTarget "HazardDetection" */ = {{
+\t\t{ids['config_list_target']} /* Build configuration list for PBXNativeTarget \"{PROJECT_NAME}\" */ = {{
 \t\t\tisa = XCConfigurationList;
 \t\t\tbuildConfigurations = (
-\t\t\t\t{I['buildConfigDebug']} /* Debug */,
-\t\t\t\t{I['buildConfigRel']} /* Release */,
+\t\t\t\t{ids['debug_target']} /* Debug */,
+\t\t\t\t{ids['release_target']} /* Release */,
 \t\t\t);
 \t\t\tdefaultConfigurationIsVisible = 0;
 \t\t\tdefaultConfigurationName = Release;
@@ -420,108 +361,56 @@ def pbxproj():
 /* End XCConfigurationList section */
 
 \t}};
-\trootObject = {I['project']} /* Project object */;
+\trootObject = {ids['project']} /* Project object */;
 }}
 """
+    return project_text, ids["target"]
 
-def xcscheme(target_id, project_name):
+
+def xcscheme(target_id):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<Scheme
-   LastUpgradeCheck = "1500"
-   version = "1.7">
-   <BuildAction
-      parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES">
+<Scheme LastUpgradeCheck="1500" version="1.7">
+   <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES">
       <BuildActionEntries>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "{target_id}"
-               BuildableName = "{project_name}.app"
-               BlueprintName = "{project_name}"
-               ReferencedContainer = "container:{project_name}.xcodeproj">
-            </BuildableReference>
+         <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{target_id}" BuildableName="{PROJECT_NAME}.app" BlueprintName="{PROJECT_NAME}" ReferencedContainer="container:{PROJECT_NAME}.xcodeproj"/>
          </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
-   <TestAction
-      buildConfiguration = "Debug"
-      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
-      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES">
-      <Testables>
-      </Testables>
+   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+      <Testables/>
    </TestAction>
-   <LaunchAction
-      buildConfiguration = "Debug"
-      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
-      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      launchStyle = "0"
-      useCustomWorkingDirectory = "NO"
-      ignoresPersistentStateOnLaunch = "NO"
-      debugDocumentVersioning = "YES"
-      debugServiceExtension = "internal"
-      allowLocationSimulation = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "{target_id}"
-            BuildableName = "{project_name}.app"
-            BlueprintName = "{project_name}"
-            ReferencedContainer = "container:{project_name}.xcodeproj">
-         </BuildableReference>
+   <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES">
+      <BuildableProductRunnable runnableDebuggingMode="0">
+         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{target_id}" BuildableName="{PROJECT_NAME}.app" BlueprintName="{PROJECT_NAME}" ReferencedContainer="container:{PROJECT_NAME}.xcodeproj"/>
       </BuildableProductRunnable>
    </LaunchAction>
-   <ProfileAction
-      buildConfiguration = "Release"
-      shouldUseLaunchSchemeArgsEnv = "YES"
-      savedToolIdentifier = ""
-      useCustomWorkingDirectory = "NO"
-      debugDocumentVersioning = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "{target_id}"
-            BuildableName = "{project_name}.app"
-            BlueprintName = "{project_name}"
-            ReferencedContainer = "container:{project_name}.xcodeproj">
-         </BuildableReference>
+   <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES">
+      <BuildableProductRunnable runnableDebuggingMode="0">
+         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{target_id}" BuildableName="{PROJECT_NAME}.app" BlueprintName="{PROJECT_NAME}" ReferencedContainer="container:{PROJECT_NAME}.xcodeproj"/>
       </BuildableProductRunnable>
    </ProfileAction>
-   <AnalyzeAction
-      buildConfiguration = "Debug">
-   </AnalyzeAction>
-   <ArchiveAction
-      buildConfiguration = "Release"
-      revealArchiveInOrganizer = "YES">
-   </ArchiveAction>
+   <AnalyzeAction buildConfiguration="Debug"/>
+   <ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
 </Scheme>
 """
 
+
 def main():
-    base = pathlib.Path(__file__).parent
-    proj_dir = base / "HazardDetection.xcodeproj"
-    proj_dir.mkdir(exist_ok=True)
+    base = pathlib.Path(__file__).resolve().parent
+    files = swift_files(base)
+    project_text, target_id = pbxproj(files)
 
-    pbx_path = proj_dir / "project.pbxproj"
-    pbx_path.write_text(pbxproj())
-    print(f"✅  Generated: {pbx_path}")
+    project_dir = base / f"{PROJECT_NAME}.xcodeproj"
+    project_dir.mkdir(exist_ok=True)
+    (project_dir / "project.pbxproj").write_text(project_text)
 
-    # Generate Scheme
-    scheme_dir = proj_dir / "xcshareddata" / "xcschemes"
+    scheme_dir = project_dir / "xcshareddata" / "xcschemes"
     scheme_dir.mkdir(parents=True, exist_ok=True)
-    scheme_path = scheme_dir / "HazardDetection.xcscheme"
-    scheme_path.write_text(xcscheme(IDs['target'], "HazardDetection"))
-    print(f"✅  Generated: {scheme_path}")
+    (scheme_dir / f"{PROJECT_NAME}.xcscheme").write_text(xcscheme(target_id))
 
-    print("👉  Open with: open HazardDetection.xcodeproj")
+    print(f"Generated project with {len(files)} Swift files")
+
 
 if __name__ == "__main__":
     main()
