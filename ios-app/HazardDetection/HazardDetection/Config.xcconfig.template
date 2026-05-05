@@ -1,13 +1,14 @@
 // Config.xcconfig
-// Configuration file for Cloudinary and Mapbox
-// 
+// Copy this file to Config.xcconfig and fill in your credentials.
+// Config.xcconfig is gitignored — never commit the real values.
+//
 // Your actual credentials configured below
 
 // ========================================
 // CLOUDINARY CONFIGURATION
 // ========================================
-CLOUDINARY_CLOUD_NAME = dhw2qum65
-CLOUDINARY_UPLOAD_PRESET = Road_Hazard_Detection_WEB
+CLOUDINARY_CLOUD_NAME = YOUR_CLOUDINARY_CLOUD_NAME
+CLOUDINARY_UPLOAD_PRESET = YOUR_CLOUDINARY_UPLOAD_PRESET
 
 // ========================================
 // MAPBOX CONFIGURATION

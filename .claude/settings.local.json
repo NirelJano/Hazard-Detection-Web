@@ -39,7 +39,13 @@
       "Bash(xargs ls *)",
       "Bash(xargs -I{} basename {})",
       "Bash(xcodebuild -project HazardDetection.xcodeproj -scheme HazardDetection -destination 'generic/platform=iOS' -configuration Debug CODE_SIGNING_ALLOWED=NO)",
-      "Bash(plutil -p \"/Users/shachafemanoel/Documents/GitHub/Hazard Detection Web/ios-app/HazardDetection/HazardDetection/best.mlpackage/Data/com.apple.CoreML/model.mlmodel\")"
+      "Bash(plutil -p \"/Users/shachafemanoel/Documents/GitHub/Hazard Detection Web/ios-app/HazardDetection/HazardDetection/best.mlpackage/Data/com.apple.CoreML/model.mlmodel\")",
+      "Bash(git commit -m 'chore: add Config.xcconfig.template for new contributor setup *)",
+      "Bash(gh pr create --title 'feat: add detection session post-processing' --base master --head feat/ios-detection-session-postprocessing --body ' *)",
+      "Bash(python3 generate_project.py)",
+      "Bash(xcodebuild -project HazardDetection.xcodeproj -scheme HazardDetection -destination 'platform=iOS,id=00008140-000C5D3A3CE0801C' build)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)"
     ]
   }
 }

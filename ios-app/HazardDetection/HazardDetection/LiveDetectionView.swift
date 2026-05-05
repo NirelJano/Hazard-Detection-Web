@@ -10,6 +10,7 @@ struct LiveDetectionView: View {
     @ObservedObject var cameraManager: CameraManager
     @EnvironmentObject private var app: AppController
     @StateObject private var autoReporter = LiveAutoReportCoordinator()
+    @StateObject private var sessionStore = DetectionSessionStore()
     @State private var tracker = DetectionTracker()
     @State private var isDetecting = false
     @State private var useTracking = false
@@ -18,6 +19,10 @@ struct LiveDetectionView: View {
     @State private var isSavingCapture = false
     @State private var captureFlash = false
     @State private var pipSourceView: UIView? = nil
+    @State private var activeSession: DetectionSession? = nil
+    @State private var showSessionSummary = false
+    @State private var sessionFinalizationResult: SessionFinalizationResult? = nil
+    @State private var isProcessingSession = false
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
     var body: some View {
@@ -163,16 +168,26 @@ struct LiveDetectionView: View {
                     }
                     .frame(maxWidth: .infinity)
 
-                    Button(action: toggleDetection) {
-                        Text(isDetecting ? "Stop Detection" : "Start Detection")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: 260)
-                            .frame(height: 48)
-                            .background(isDetecting ? Color.appDanger : Color.appSuccess)
-                            .clipShape(Capsule())
-                            .shadow(radius: 4)
+                    Button(action: isProcessingSession ? {} : toggleDetection) {
+                        HStack(spacing: 8) {
+                            if isProcessingSession {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                                    .scaleEffect(0.8)
+                            }
+                            Text(isProcessingSession ? "Processing..." : (isDetecting ? "Stop Detection" : "Start Detection"))
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: 260)
+                        .frame(height: 48)
+                        .background(isDetecting ? Color.appDanger : Color.appSuccess)
+                        .opacity(isProcessingSession ? 0.7 : 1.0)
+                        .clipShape(Capsule())
+                        .shadow(radius: 4)
                     }
+                    .disabled(isProcessingSession)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -231,6 +246,7 @@ struct LiveDetectionView: View {
             autoReporter.stop()
             cameraManager.stopSession()
             app.motionService.stop()
+            abandonSession()
         }
         .onReceive(NotificationCenter.default.publisher(for: .stopLiveCameraSession)) { _ in
             isDetecting = false
@@ -238,6 +254,18 @@ struct LiveDetectionView: View {
             tracker.reset()
             autoReporter.stop()
             cameraManager.stopSession()
+            abandonSession()
+        }
+        .sheet(isPresented: $showSessionSummary) {
+            if let result = sessionFinalizationResult {
+                SessionSummaryView(result: result) {
+                    showSessionSummary = false
+                    sessionFinalizationResult = nil
+                    app.liveMessage = result.finalReportCount > 0
+                        ? "\(result.finalReportCount) report\(result.finalReportCount > 1 ? "s" : "") queued."
+                        : "No hazards confirmed."
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .startLiveCameraSession)) { _ in
             Task { @MainActor in
@@ -280,12 +308,57 @@ struct LiveDetectionView: View {
             app.locationService.requestPermission()
             cameraManager.startSession()
             app.liveMessage = nil
+            activeSession = try? sessionStore.startSession()
         } else {
             overlays = []
             tracker.reset()
             autoReporter.stop()
-            app.liveMessage = "Detection paused"
+            app.liveMessage = "Processing session..."
+            endSessionAndFinalize()
         }
+    }
+
+    private func endSessionAndFinalize() {
+        guard let session = activeSession else {
+            app.liveMessage = "Detection paused"
+            return
+        }
+        sessionStore.flush()
+        try? sessionStore.endSession(session)
+
+        let service = app.reportCreationService
+        let frameFileStore = sessionStore.frameFileStore
+        let userId = app.authManager.user?.uid ?? ""
+        let profile = app.userProfile
+        isProcessingSession = true
+
+        Task {
+            let candidates = (try? sessionStore.candidates(for: session.id)) ?? []
+            let finalizer = ReportFinalizer(creationService: service, frameFileStore: frameFileStore)
+            let result = await finalizer.finalize(
+                session: session,
+                candidates: candidates,
+                userId: userId,
+                userProfile: profile
+            )
+            try? sessionStore.finalizeSession(
+                session,
+                finalReportCount: result.finalReportCount,
+                skippedCount: result.skippedCandidateCount
+            )
+            sessionFinalizationResult = result
+            activeSession = nil
+            isProcessingSession = false
+            showSessionSummary = true
+            app.liveMessage = nil
+        }
+    }
+
+    private func abandonSession() {
+        guard let session = activeSession else { return }
+        sessionStore.flush()
+        try? sessionStore.endSession(session)
+        activeSession = nil
     }
 
     private func captureSnapshot() {
@@ -330,6 +403,21 @@ struct LiveDetectionView: View {
     private func handle(_ candidates: [DetectionCandidate]) {
         let speed = max(app.locationService.currentLocation?.speed ?? 0, 0)
         cameraManager.updateConfidenceThreshold(forSpeed: speed)
+
+        // Record accepted candidates for session post-processing
+        if let session = activeSession, !candidates.isEmpty {
+            let frame = cameraManager.snapshotImage()
+            let location = app.locationService.currentLocation
+            for candidate in candidates {
+                sessionStore.addCandidate(
+                    sessionId: session.id,
+                    candidate: candidate,
+                    image: frame,
+                    location: location
+                )
+                sessionStore.incrementCandidateCount(session)
+            }
+        }
 
         // Keep PiP status label in sync with current detection state
         let pipText = candidates.isEmpty ? "Scanning..." : "\(candidates.count) Hazard\(candidates.count > 1 ? "s" : "")"
