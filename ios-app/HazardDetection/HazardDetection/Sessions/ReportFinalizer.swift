@@ -36,20 +36,14 @@ final class ReportFinalizer {
         let rawCount = candidates.count
 
         guard !candidates.isEmpty else {
-            finalizerLogger.info("Session \(session.id.uuidString, privacy: .public): no candidates")
             return SessionFinalizationResult(
-                finalReportCount: 0,
-                skippedCandidateCount: 0,
-                failedCount: 0,
-                sessionDuration: sessionDuration,
-                rawCandidateCount: rawCount
+                finalReportCount: 0, skippedCandidateCount: 0, failedCount: 0,
+                sessionDuration: sessionDuration, rawCandidateCount: rawCount
             )
         }
 
         let clusters = clusterer.cluster(candidates)
-        finalizerLogger.info(
-            "Session \(session.id.uuidString, privacy: .public): \(rawCount) candidates → \(clusters.count) clusters"
-        )
+        finalizerLogger.info("\(rawCount) candidates → \(clusters.count) clusters")
 
         var finalReportCount = 0
         var skippedCount = 0
@@ -57,37 +51,21 @@ final class ReportFinalizer {
 
         for cluster in clusters {
             guard filter.shouldAccept(cluster: cluster) else {
-                let reason = filter.rejectionReason(for: cluster) ?? "unknown"
-                finalizerLogger.debug("Cluster \(cluster.label, privacy: .public) rejected: \(reason, privacy: .public)")
                 skippedCount += cluster.candidates.count
                 continue
             }
-
             guard let best = frameSelector.selectBestCandidate(from: cluster) else {
                 skippedCount += cluster.candidates.count
                 continue
             }
-
             do {
-                try await submitReport(
-                    cluster: cluster,
-                    bestCandidate: best,
-                    session: session,
-                    userId: userId,
-                    userProfile: userProfile
-                )
+                try await submitReport(cluster: cluster, bestCandidate: best, session: session, userId: userId, userProfile: userProfile)
                 finalReportCount += 1
             } catch {
-                finalizerLogger.error(
-                    "Failed to submit \(cluster.label, privacy: .public): \(error.localizedDescription, privacy: .public)"
-                )
+                finalizerLogger.error("Failed to submit \(cluster.label, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 failedCount += 1
             }
         }
-
-        finalizerLogger.info(
-            "Finalization done: \(finalReportCount) reports, \(skippedCount) skipped, \(failedCount) failed"
-        )
 
         return SessionFinalizationResult(
             finalReportCount: finalReportCount,
@@ -97,8 +75,6 @@ final class ReportFinalizer {
             rawCandidateCount: rawCount
         )
     }
-
-    // MARK: - Private
 
     private func submitReport(
         cluster: CandidateCluster,
@@ -110,9 +86,7 @@ final class ReportFinalizer {
         guard let fileName = bestCandidate.imageFileName,
               let image = try? frameFileStore.loadFrame(fileName: fileName, sessionId: session.id),
               let imageData = image.jpegData(compressionQuality: 0.8)
-        else {
-            throw ReportFinalizerError.noImageAvailable
-        }
+        else { throw ReportFinalizerError.noImageAvailable }
 
         guard let location = decodeLocation(bestCandidate.locationJSON) else {
             throw ReportFinalizerError.missingLocation
@@ -149,9 +123,6 @@ final class ReportFinalizer {
         )
 
         try await creationService.submit(draft, userId: userId, userProfile: userProfile)
-        finalizerLogger.info(
-            "Queued report: \(cluster.label, privacy: .public) conf=\(bestCandidate.confidence, format: .fixed(precision: 2), privacy: .public)"
-        )
     }
 
     private func decodeLocation(_ data: Data?) -> CandidateLocation? {

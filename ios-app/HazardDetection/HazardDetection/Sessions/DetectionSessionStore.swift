@@ -10,7 +10,6 @@ private let storeLogger = Logger(subsystem: "com.hazarddetection", category: "De
 final class DetectionSessionStore: ObservableObject {
     let frameFileStore = SessionFrameFileStore()
 
-    // Rate-limit frame saving to at most maxFramesPerWindow per frameSaveWindowSeconds
     private static let maxFramesPerWindow = 5
     private static let frameSaveWindowSeconds: Double = 60
     private static let minConfidenceForFrameSave: Double = 0.50
@@ -37,9 +36,7 @@ final class DetectionSessionStore: ObservableObject {
         session.endedAt = Date()
         session.status = .processing
         try modelContext.save()
-        storeLogger.info(
-            "Session ended: \(session.id.uuidString, privacy: .public), candidates: \(session.candidateCount)"
-        )
+        storeLogger.info("Session ended: \(session.id.uuidString, privacy: .public), candidates: \(session.candidateCount)")
     }
 
     func updateStatus(_ session: DetectionSession, status: DetectionSessionStatus) throws {
@@ -47,11 +44,7 @@ final class DetectionSessionStore: ObservableObject {
         try modelContext.save()
     }
 
-    func finalizeSession(
-        _ session: DetectionSession,
-        finalReportCount: Int,
-        skippedCount: Int
-    ) throws {
+    func finalizeSession(_ session: DetectionSession, finalReportCount: Int, skippedCount: Int) throws {
         session.finalReportCount = finalReportCount
         session.skippedCandidateCount = skippedCount
         session.status = .completed
@@ -70,11 +63,9 @@ final class DetectionSessionStore: ObservableObject {
         sessionId: UUID,
         candidate: DetectionCandidate,
         image: UIImage?,
-        location: CLLocation?,
-        gateDecision: DetectionGateDecision?
+        location: CLLocation?
     ) {
         let encoder = JSONEncoder()
-
         guard let boundingBoxJSON = try? encoder.encode(CodableRect(candidate.boundingBox)) else { return }
 
         var locationJSON: Data? = nil
@@ -85,20 +76,6 @@ final class DetectionSessionStore: ObservableObject {
                 horizontalAccuracy: loc.horizontalAccuracy > 0 ? loc.horizontalAccuracy : nil
             )
             locationJSON = try? encoder.encode(cl)
-        }
-
-        var conditionScoreJSON: Data? = nil
-        if let decision = gateDecision {
-            let score = CandidateConditionScore(
-                effectiveThreshold: decision.effectiveThreshold,
-                gateReasons: decision.reasons,
-                brightness: decision.frameQuality?.brightness,
-                blurScore: decision.frameQuality?.blurScore,
-                isInsideROI: decision.roi.isInsideROI,
-                isInIgnoredBottomBand: decision.roi.isInIgnoredBottomBand,
-                isDeviceStable: decision.motion?.isDeviceStable
-            )
-            conditionScoreJSON = try? encoder.encode(score)
         }
 
         let candidateId = UUID()
@@ -118,10 +95,8 @@ final class DetectionSessionStore: ObservableObject {
             rawLabel: candidate.label,
             displayLabel: candidate.label,
             confidence: Double(candidate.confidence),
-            effectiveThreshold: gateDecision?.effectiveThreshold,
             boundingBoxJSON: boundingBoxJSON,
             locationJSON: locationJSON,
-            conditionScoreJSON: conditionScoreJSON,
             imageFileName: imageFileName
         )
 
@@ -147,7 +122,7 @@ final class DetectionSessionStore: ObservableObject {
         return try modelContext.fetch(descriptor)
     }
 
-    // MARK: - Flush pending inserts
+    // MARK: - Flush
 
     func flush() {
         if pendingInsertCount > 0 {

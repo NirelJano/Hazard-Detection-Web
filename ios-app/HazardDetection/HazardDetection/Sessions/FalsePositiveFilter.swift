@@ -38,8 +38,6 @@ struct FalsePositiveFilter {
         return nil
     }
 
-    // MARK: - Private
-
     private func decodeConditionScore(_ data: Data?) -> CandidateConditionScore? {
         guard let data else { return nil }
         return try? JSONDecoder().decode(CandidateConditionScore.self, from: data)

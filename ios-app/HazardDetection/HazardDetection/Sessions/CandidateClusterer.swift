@@ -32,8 +32,6 @@ struct CandidateClusterer {
         return clusters.map { CandidateCluster(id: UUID(), label: $0.label, candidates: $0.candidates) }
     }
 
-    // MARK: - Private
-
     private func findMatchingCluster(
         for candidate: SessionDetectionCandidate,
         in clusters: [MutableCluster]
@@ -54,7 +52,6 @@ struct CandidateClusterer {
                     return index
                 }
             } else {
-                // No GPS available — fall back to label + time window match
                 return index
             }
         }

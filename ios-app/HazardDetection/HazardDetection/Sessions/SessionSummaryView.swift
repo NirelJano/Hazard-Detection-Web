@@ -21,21 +21,9 @@ struct SessionSummaryView: View {
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                SummaryStatCell(
-                    value: "\(result.rawCandidateCount)",
-                    label: "Detections",
-                    color: .appPrimary
-                )
-                SummaryStatCell(
-                    value: "\(result.finalReportCount)",
-                    label: "Reports Queued",
-                    color: .appSuccess
-                )
-                SummaryStatCell(
-                    value: "\(result.skippedCandidateCount)",
-                    label: "Filtered Out",
-                    color: .appWarning
-                )
+                SummaryStatCell(value: "\(result.rawCandidateCount)", label: "Detections", color: .appPrimary)
+                SummaryStatCell(value: "\(result.finalReportCount)", label: "Reports Queued", color: .appSuccess)
+                SummaryStatCell(value: "\(result.skippedCandidateCount)", label: "Filtered Out", color: .appWarning)
                 SummaryStatCell(
                     value: "\(result.failedCount)",
                     label: "Failed",
@@ -45,13 +33,13 @@ struct SessionSummaryView: View {
             .padding(.horizontal, 20)
 
             if result.finalReportCount == 0 && result.rawCandidateCount > 0 {
-                Text("No confirmed hazards after post-processing. Weak or duplicate detections were filtered out.")
+                Text("No confirmed hazards after post-processing.")
                     .font(.system(size: 13))
                     .foregroundColor(.white.opacity(0.55))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
             } else if result.rawCandidateCount == 0 {
-                Text("No detections were recorded in this session.")
+                Text("No detections recorded in this session.")
                     .font(.system(size: 13))
                     .foregroundColor(.white.opacity(0.55))
                     .multilineTextAlignment(.center)
@@ -80,10 +68,7 @@ struct SessionSummaryView: View {
         let total = Int(result.sessionDuration)
         let minutes = total / 60
         let seconds = total % 60
-        if minutes > 0 {
-            return "\(minutes)m \(seconds)s session"
-        }
-        return "\(seconds)s session"
+        return minutes > 0 ? "\(minutes)m \(seconds)s session" : "\(seconds)s session"
     }
 }
 

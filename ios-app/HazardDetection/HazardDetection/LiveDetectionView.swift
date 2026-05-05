@@ -19,14 +19,10 @@ struct LiveDetectionView: View {
     @State private var isSavingCapture = false
     @State private var captureFlash = false
     @State private var pipSourceView: UIView? = nil
-    @State private var conditionAnalyzer = CameraConditionAnalyzer()
-    @State private var gateDebugState = DetectionGateDebugState()
-    @State private var lastAcceptedCandidates: [DetectionCandidate] = []
     @State private var activeSession: DetectionSession? = nil
     @State private var showSessionSummary = false
     @State private var sessionFinalizationResult: SessionFinalizationResult? = nil
     @State private var isProcessingSession = false
-    private let detectionGate = DetectionGate()
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
     var body: some View {
@@ -63,16 +59,6 @@ struct LiveDetectionView: View {
                     .zIndex(2)
             }
 
-            if app.detectionPreferences.enableDebugOverlay {
-                DetectionDebugOverlay(
-                    preferences: app.detectionPreferences,
-                    state: gateDebugState
-                )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .zIndex(0.8)
-            }
-
             VStack {
                 Spacer()
 
@@ -85,7 +71,7 @@ struct LiveDetectionView: View {
 
                 EnhancedHUDView(
                     isDetecting: isDetecting,
-                    hazardCount: lastAcceptedCandidates.count,
+                    hazardCount: cameraManager.detectedHazards.count,
                     message: liveStatusMessage,
                     location: app.locationService.currentCoordinate != nil ? "GPS Active" : "Searching GPS...",
                     speedKmh: speedKmh,
@@ -256,22 +242,18 @@ struct LiveDetectionView: View {
             guard !app.pipManager.isPiPActive else { return }
             isDetecting = false
             overlays = []
-            lastAcceptedCandidates = []
             tracker.reset()
             autoReporter.stop()
             cameraManager.stopSession()
             app.motionService.stop()
-            // Save session data without finalizing — data is recoverable for future processing.
             abandonSession()
         }
         .onReceive(NotificationCenter.default.publisher(for: .stopLiveCameraSession)) { _ in
             isDetecting = false
             overlays = []
-            lastAcceptedCandidates = []
             tracker.reset()
             autoReporter.stop()
             cameraManager.stopSession()
-            app.motionService.stop()
             abandonSession()
         }
         .sheet(isPresented: $showSessionSummary) {
@@ -289,7 +271,6 @@ struct LiveDetectionView: View {
             Task { @MainActor in
                 if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
                     cameraManager.startSession()
-                    app.motionService.start()
                 }
             }
         }
@@ -306,7 +287,7 @@ struct LiveDetectionView: View {
 
     private var canCapture: Bool {
         isDetecting &&
-        !lastAcceptedCandidates.isEmpty &&
+        !cameraManager.detectedHazards.isEmpty &&
         app.locationService.currentCoordinate != nil
     }
 
@@ -321,21 +302,17 @@ struct LiveDetectionView: View {
         isDetecting.toggle()
         if isDetecting {
             overlays = []
-            lastAcceptedCandidates = []
             tracker.reset()
             previousHazardCount = 0
             autoReporter.resetSession()
             app.locationService.requestPermission()
             cameraManager.startSession()
-            app.motionService.start()
             app.liveMessage = nil
             activeSession = try? sessionStore.startSession()
         } else {
             overlays = []
-            lastAcceptedCandidates = []
             tracker.reset()
             autoReporter.stop()
-            app.motionService.stop()
             app.liveMessage = "Processing session..."
             endSessionAndFinalize()
         }
@@ -343,7 +320,6 @@ struct LiveDetectionView: View {
 
     private func endSessionAndFinalize() {
         guard let session = activeSession else {
-            activeSession = nil
             app.liveMessage = "Detection paused"
             return
         }
@@ -389,10 +365,10 @@ struct LiveDetectionView: View {
         guard
             let image = cameraManager.snapshotImage(),
             let coordinate = app.locationService.currentCoordinate,
-            !lastAcceptedCandidates.isEmpty
+            !cameraManager.detectedHazards.isEmpty
         else { return }
 
-        let detections = lastAcceptedCandidates
+        let detections = cameraManager.detectedHazards
         let labels = Array(NSOrderedSet(array: detections.map(\.label))) as? [String] ?? []
         let hazardType = labels.joined(separator: ", ")
 
@@ -427,45 +403,24 @@ struct LiveDetectionView: View {
     private func handle(_ candidates: [DetectionCandidate]) {
         let speed = max(app.locationService.currentLocation?.speed ?? 0, 0)
         cameraManager.updateConfidenceThreshold(forSpeed: speed)
-        let frame = cameraManager.snapshotImage()
-        let frameQuality = app.detectionPreferences.enableFrameQualitySignals
-            ? conditionAnalyzer.analyzeIfNeeded(image: frame)
-            : nil
-        let motionSnapshot = app.motionService.currentSnapshot()
-        let motion = app.detectionPreferences.enableMotionSignals
-            ? app.motionSignalProvider.signal(from: motionSnapshot)
-            : nil
-        let gateResults = candidates.map { candidate in
-            detectionGate.evaluate(
-                candidate: candidate,
-                speedMetersPerSecond: speed,
-                frameQuality: frameQuality,
-                motion: motion,
-                preferences: app.detectionPreferences,
-                recentStabilityScore: Double(app.motionService.stabilityScore)
-            )
-        }
-        let acceptedPairs = zip(candidates, gateResults).filter { _, d in d.accepted }
-        let acceptedCandidates = acceptedPairs.map(\.0)
-        lastAcceptedCandidates = acceptedCandidates
 
         // Record accepted candidates for session post-processing
-        if let session = activeSession {
-            for (candidate, decision) in acceptedPairs {
+        if let session = activeSession, !candidates.isEmpty {
+            let frame = cameraManager.snapshotImage()
+            let location = app.locationService.currentLocation
+            for candidate in candidates {
                 sessionStore.addCandidate(
                     sessionId: session.id,
                     candidate: candidate,
                     image: frame,
-                    location: app.locationService.currentLocation,
-                    gateDecision: decision
+                    location: location
                 )
                 sessionStore.incrementCandidateCount(session)
             }
         }
-        updateGateDebugState(decisions: gateResults, frameQuality: frameQuality, motion: motion)
 
         // Keep PiP status label in sync with current detection state
-        let pipText = acceptedCandidates.isEmpty ? "Scanning..." : "\(acceptedCandidates.count) Hazard\(acceptedCandidates.count > 1 ? "s" : "")"
+        let pipText = candidates.isEmpty ? "Scanning..." : "\(candidates.count) Hazard\(candidates.count > 1 ? "s" : "")"
         app.pipManager.updateStatus(pipText)
 
         // Update road attention service each frame (no user tap here — taps handled in CameraView callback)
@@ -474,12 +429,13 @@ struct LiveDetectionView: View {
             frameSize: cameraManager.latestFrameSize ?? CGSize(width: 720, height: 1280),
             pitch: app.motionService.pitch,
             roll: app.motionService.roll,
-            stableDetections: acceptedCandidates
+            stableDetections: candidates
         )
 
+        let frame = cameraManager.snapshotImage()
         let metadata = liveFrameMetadata(imageSize: frame?.size ?? cameraManager.latestFrameSize ?? CGSize(width: 720, height: 1280))
         autoReporter.ingest(
-            detections: acceptedCandidates,
+            detections: candidates,
             frame: frame,
             location: app.locationService.currentLocation,
             speed: speed,
@@ -511,14 +467,14 @@ struct LiveDetectionView: View {
 
         if useTracking {
             let result = tracker.update(
-                with: acceptedCandidates,
-                frame: frame,
+                with: candidates,
+                frame: cameraManager.snapshotImage(),
                 speed: speed
             )
             mergeOverlays(result.overlays)
         } else {
             // Raw mode — show model detections directly without tracking or smoothing
-            overlays = acceptedCandidates.enumerated().map { index, c in
+            overlays = candidates.enumerated().map { index, c in
                 TrackedOverlay(
                     id: index,
                     label: c.label,
@@ -531,24 +487,6 @@ struct LiveDetectionView: View {
                 )
             }
         }
-    }
-
-    private func updateGateDebugState(
-        decisions: [DetectionGateDecision],
-        frameQuality: FrameQualityScore?,
-        motion: MotionSignal?
-    ) {
-        let accepted = decisions.filter(\.accepted)
-        let rejected = decisions.count - accepted.count
-        gateDebugState = DetectionGateDebugState(
-            lastEffectiveThreshold: decisions.last?.effectiveThreshold ?? gateDebugState.lastEffectiveThreshold,
-            acceptedCandidateCount: accepted.count,
-            rejectedCandidateCount: rejected,
-            lastGateReasons: decisions.last?.reasons ?? [],
-            lastROI: decisions.last?.roi,
-            currentFrameQuality: frameQuality,
-            currentMotion: motion
-        )
     }
 
     private func liveFrameMetadata(imageSize: CGSize) -> FrameMetadata {
@@ -669,57 +607,6 @@ private struct QualityHintBanner: View {
         .background(Color.black.opacity(0.65))
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.appWarning.opacity(0.5), lineWidth: 1))
-    }
-}
-
-// MARK: - Detection Debug Overlay
-
-private struct DetectionDebugOverlay: View {
-    @ObservedObject var preferences: DetectionPreferences
-    let state: DetectionGateDebugState
-
-    var body: some View {
-        GeometryReader { geo in
-            let bottomHeight = geo.size.height * preferences.bottomIgnoreRatio
-            let boundaryY = geo.size.height - bottomHeight
-
-            ZStack(alignment: .topLeading) {
-                Rectangle()
-                    .fill(Color.appDanger.opacity(preferences.enableROI ? 0.16 : 0.06))
-                    .frame(height: bottomHeight)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-
-                Path { path in
-                    path.move(to: CGPoint(x: 0, y: boundaryY))
-                    path.addLine(to: CGPoint(x: geo.size.width, y: boundaryY))
-                }
-                .stroke(Color.appWarning.opacity(0.85), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
-
-                RoundedRectangle(cornerRadius: 0)
-                    .stroke(Color.appPrimary.opacity(0.7), style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                    .frame(height: max(boundaryY, 0))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Gate \(Int(state.lastEffectiveThreshold * 100))%")
-                    Text("A \(state.acceptedCandidateCount) / R \(state.rejectedCandidateCount)")
-                    Text(state.lastGateReasons.prefix(3).joined(separator: ", "))
-                        .lineLimit(2)
-                    if let quality = state.currentFrameQuality {
-                        Text("Light \(Int(quality.brightness * 100))  Blur \(String(format: "%.3f", quality.blurScore))")
-                    }
-                    if let motion = state.currentMotion {
-                        Text(motion.isDeviceStable ? "Motion stable" : "Motion unstable")
-                    }
-                }
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.62))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.top, 58)
-                .padding(.leading, 12)
-            }
-        }
     }
 }
 
