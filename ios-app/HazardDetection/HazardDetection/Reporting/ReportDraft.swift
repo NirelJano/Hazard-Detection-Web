@@ -71,6 +71,34 @@ struct DetectionMetadata: Codable {
     var detectionConfidence: Double?
     var detectionSource: String?
     var detectionBoundingBox: CodableRect?
+    // Session post-processing fields — all optional and additive
+    var sourceSessionId: UUID?
+    var sourceCandidateIds: [UUID]?
+    var effectiveThreshold: Double?
+    var gateReasons: [String]?
+    var postProcessed: Bool?
+
+    init(
+        detectedLabel: String? = nil,
+        detectionConfidence: Double? = nil,
+        detectionSource: String? = nil,
+        detectionBoundingBox: CodableRect? = nil,
+        sourceSessionId: UUID? = nil,
+        sourceCandidateIds: [UUID]? = nil,
+        effectiveThreshold: Double? = nil,
+        gateReasons: [String]? = nil,
+        postProcessed: Bool? = nil
+    ) {
+        self.detectedLabel = detectedLabel
+        self.detectionConfidence = detectionConfidence
+        self.detectionSource = detectionSource
+        self.detectionBoundingBox = detectionBoundingBox
+        self.sourceSessionId = sourceSessionId
+        self.sourceCandidateIds = sourceCandidateIds
+        self.effectiveThreshold = effectiveThreshold
+        self.gateReasons = gateReasons
+        self.postProcessed = postProcessed
+    }
 }
 
 struct CodableRect: Codable, Equatable {

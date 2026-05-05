@@ -375,6 +375,23 @@ final class ReportRepository: ObservableObject {
                 if let bbox = draft.boundingBox {
                     data["detectionBoundingBox"] = DetectionBoundingBox(from: bbox.cgRect).dictionary
                 }
+                if let meta = draft.metadata {
+                    if let sessionId = meta.sourceSessionId {
+                        data["sourceSessionId"] = sessionId.uuidString
+                    }
+                    if let candidateIds = meta.sourceCandidateIds, !candidateIds.isEmpty {
+                        data["sourceCandidateIds"] = candidateIds.map { $0.uuidString }
+                    }
+                    if let threshold = meta.effectiveThreshold {
+                        data["effectiveThreshold"] = threshold
+                    }
+                    if let reasons = meta.gateReasons, !reasons.isEmpty {
+                        data["gateReasons"] = reasons
+                    }
+                    if meta.postProcessed == true {
+                        data["postProcessed"] = true
+                    }
+                }
 
                 transaction.setData(data, forDocument: reportRef)
                 return newCount
