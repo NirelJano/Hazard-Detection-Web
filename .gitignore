@@ -44,5 +44,6 @@ venv*/
 admin-tools/serviceAccountKey.json
 admin-tools/node_modules/
 
-# iOS secrets
+# iOS secrets — keep local xcconfig files with real credentials out of git
 ios-app/HazardDetection/Secrets.xcconfig
+ios-app/HazardDetection/HazardDetection/Config.xcconfig
